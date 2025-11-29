@@ -52,6 +52,23 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : import.meta.env.VITE_
 
 const RANDOM_NICKNAMES = ['干饭王', '碳水教父', '奶茶脑袋', '火锅战神', '减肥失败者', '随缘食客', '周五烧烤'];
 
+const INITIAL_OPEN_EVENTS = [
+  {
+    id: 'ab_confirmed_table',
+    title: '产品阿强 x Java老哥 的饭局',
+    description: 'A 主动邀了 B，B 偏好 2 人以上，饭局对好友开放拼桌',
+    sizePreference: '3-4人',
+    food: '日料 + 湘味混搭',
+    time: '12:10',
+    location: '公司楼下 · 二楼食堂',
+    participants: [
+      { friendId: 1, role: '发起人（用户A）' },
+      { friendId: 3, role: '确认嘉宾（用户B）' }
+    ],
+    joined: false
+  }
+];
+
 const INITIAL_FRIENDS = [
   {
     id: 1,
@@ -149,6 +166,8 @@ export default function LunchBuddyApp() {
   const [editedName, setEditedName] = useState('');
 
   const [notification, setNotification] = useState(null);
+
+  const [openDiningEvents, setOpenDiningEvents] = useState(INITIAL_OPEN_EVENTS);
 
   useEffect(() => {
     if (!auth || !db) {
@@ -422,6 +441,22 @@ export default function LunchBuddyApp() {
     setShowNoteModal(false);
   };
 
+  const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
+  const eventHasFriend = (event) => event.participants.some((p) => !!getParticipantProfile(p));
+  const handleJoinOpenEvent = (eventId) => {
+    setOpenDiningEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== eventId || event.joined) return event;
+        const selfParticipant = {
+          friendId: null,
+          role: `${userProfile?.nickname || '我'} 已加入`,
+          isSelf: true
+        };
+        return { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+      })
+    );
+  };
+
   const NotificationOverlay = () => {
     if (!notification) return null;
     return (
@@ -590,6 +625,87 @@ export default function LunchBuddyApp() {
     );
   };
 
+  const OpenDiningCard = ({ event }) => {
+    const canJoin = eventHasFriend(event);
+    const participantBadges = event.participants.map((p, idx) => {
+      const profile = getParticipantProfile(p);
+      const displayName = p.isSelf ? userProfile?.nickname || '我' : profile?.nickname || p.name || '嘉宾';
+      const baseColor = profile?.avatarColor ? `${profile.avatarColor} text-white` : '';
+      const color = p.isSelf ? 'bg-emerald-100 text-emerald-700' : baseColor;
+      const safeColor = color || 'bg-gray-100 text-gray-500';
+      return (
+        <span
+          key={`${event.id}-${idx}`}
+          className={`text-[10px] px-2 py-1 rounded-full inline-flex items-center gap-1 font-bold ${safeColor}`}
+        >
+          <Users size={10} /> {displayName}
+          <span className="font-medium text-[9px] opacity-80">{p.role}</span>
+        </span>
+      );
+    });
+
+    return (
+      <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="space-y-1">
+            <p className="text-xs text-orange-500 font-bold inline-flex items-center gap-1">
+              <BellRing size={14} /> 已确认饭局 · 接受加入
+            </p>
+            <h3 className="text-lg font-bold text-gray-800 leading-tight">{event.title}</h3>
+            <p className="text-xs text-gray-500">{event.description}</p>
+          </div>
+          <span className="text-[10px] bg-white text-orange-500 px-2 py-1 rounded-full border border-orange-200 font-bold whitespace-nowrap">
+            {event.sizePreference}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">{participantBadges}</div>
+        <div className="grid grid-cols-3 gap-3 text-xs text-gray-600">
+          <div className="bg-white rounded-xl p-3 border border-orange-100">
+            <Utensils size={14} className="text-orange-500 mb-1" />
+            <p className="font-bold text-gray-800">{event.food}</p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-orange-100">
+            <Clock size={14} className="text-green-500 mb-1" />
+            <p className="font-bold text-gray-800">{event.time}</p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-orange-100">
+            <MapPin size={14} className="text-purple-500 mb-1" />
+            <p className="font-bold text-gray-800 truncate">{event.location}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-1 text-[11px] text-gray-500">
+            <Users size={12} className="text-orange-500" />
+            <span>至少一位好友在场，可自由加入</span>
+          </div>
+          {canJoin ? (
+            <button
+              onClick={() => handleJoinOpenEvent(event.id)}
+              disabled={event.joined}
+              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1 ${
+                event.joined
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+              }`}
+            >
+              {event.joined ? (
+                <>
+                  <Check size={14} /> 已加入
+                </>
+              ) : (
+                <>
+                  <UserPlus size={14} /> 加入
+                </>
+              )}
+            </button>
+          ) : (
+            <span className="text-[11px] text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">暂无好友参与，无法加入</span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const FriendCard = ({ friend }) => (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 animate-slide-up flex flex-col gap-3">
       <div className="flex items-start justify-between">
@@ -657,6 +773,7 @@ export default function LunchBuddyApp() {
   );
 
   const HomeView = () => {
+    const visibleOpenEvents = openDiningEvents.filter((event) => eventHasFriend(event));
     if (confirmedDining) {
       return (
         <div className="flex flex-col h-full bg-orange-50">
@@ -846,6 +963,20 @@ export default function LunchBuddyApp() {
           )}
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-6 pb-24">
+          {visibleOpenEvents.length > 0 && (
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 px-1">
+                <CalendarCheck className="text-orange-500" size={18} />
+                <h2 className="font-bold text-gray-800">好友在场的开放饭局</h2>
+                <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">{visibleOpenEvents.length}</span>
+              </div>
+              <div className="space-y-3">
+                {visibleOpenEvents.map((event) => (
+                  <OpenDiningCard key={event.id} event={event} />
+                ))}
+              </div>
+            </div>
+          )}
           {myStatus === 'active' ? (
             <div className="space-y-8">
               <div>
