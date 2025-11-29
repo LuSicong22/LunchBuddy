@@ -25,7 +25,8 @@ import {
   Edit2,
   Save,
   Edit,
-  UserPlus
+  UserPlus,
+  LogIn
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
@@ -365,69 +366,62 @@ export default function LunchBuddyApp() {
 
   const OpenDiningCard = ({ event }) => {
     const canJoin = eventHasFriend(event);
-    const participantBadges = event.participants.map((p, idx) => {
+    const participants = event.participants.map((p, idx) => {
       const profile = getParticipantProfile(p);
-      const displayName = p.isSelf ? userProfile?.nickname || '我' : profile?.nickname || p.name || '嘉宾';
-      const baseColor = profile?.avatarColor ? `${profile.avatarColor} text-white` : '';
-      const color = p.isSelf ? 'bg-emerald-100 text-emerald-700' : baseColor;
-      const safeColor = color || 'bg-gray-100 text-gray-500';
-      return (
-        <span
-          key={`${event.id}-${idx}`}
-          className={`text-[10px] px-2 py-1 rounded-full inline-flex items-center gap-1 font-bold ${safeColor}`}
-        >
-          <Users size={10} /> {displayName}
-          <span className="font-medium text-[9px] opacity-80">{p.role}</span>
-        </span>
-      );
+      return {
+        id: profile?.id ?? `guest-${idx}`,
+        nickname: p.isSelf ? userProfile?.nickname || '我' : profile?.nickname || p.name || '嘉宾',
+        avatarColor: p.isSelf ? 'bg-emerald-500' : profile?.avatarColor || 'bg-gray-300'
+      };
     });
 
+    const badgeText = event.joined ? '已加入' : canJoin ? '可加入' : '等待好友';
+
     return (
-      <div className="bg-white border border-orange-100 rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-bold text-gray-800 leading-tight">{event.title}</h3>
-          <span className="text-[11px] bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100 font-bold whitespace-nowrap">
-            {event.sizePreference}
-          </span>
+      <div className="bg-gradient-to-br from-orange-50 to-white rounded-2xl p-4 shadow-md border border-orange-100 animate-slide-up relative overflow-hidden mb-4">
+        <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-1 rounded-bl-xl font-bold">
+          {badgeText}
         </div>
-        <div className="grid grid-cols-3 gap-3 text-sm text-gray-700">
-          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
-            <Utensils size={16} className="text-orange-500" />
-            <span className="font-bold truncate">{event.food}</span>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center">
+            <div className="flex -space-x-3">
+              {participants.map((p, idx) => (
+                <div
+                  key={p.id}
+                  className={`w-10 h-10 rounded-full ${p.avatarColor} border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-sm z-[${
+                    10 - idx
+                  }]`}
+                >
+                  {p.nickname[0]}
+                </div>
+              ))}
+              <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-400 text-xs font-bold shadow-sm z-0">
+                +
+              </div>
+            </div>
+            <div className="ml-3">
+              <span className="text-sm font-bold text-gray-800">{participants.map((p) => p.nickname).join(' & ')}</span>
+              <span className="text-xs text-gray-500 block">等 {participants.length} 人</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
-            <Clock size={16} className="text-green-500" />
-            <span className="font-bold">{event.time}</span>
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.food}</span>
+            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.location}</span>
+            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.sizePreference}</span>
           </div>
-          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
-            <MapPin size={16} className="text-purple-500" />
-            <span className="font-bold truncate">{event.location}</span>
-          </div>
-        </div>
-        <div className="flex justify-end">
-          {canJoin ? (
-            <button
-              onClick={() => handleJoinOpenEvent(event.id)}
-              disabled={event.joined}
-              className={`flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-colors gap-1 ${
-                event.joined
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-900 text-white hover:bg-black'
-              }`}
-            >
-              {event.joined ? (
-                <>
-                  <Check size={14} /> 已加入
-                </>
-              ) : (
-                <>
-                  <UserPlus size={14} /> 加入
-                </>
-              )}
-            </button>
-          ) : (
-            <span className="text-[12px] text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">暂无好友参与</span>
-          )}
+          <button
+            onClick={() => handleJoinOpenEvent(event.id)}
+            disabled={!canJoin || event.joined}
+            className={`w-full py-2 mt-1 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border transition-colors ${
+              event.joined
+                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                : canJoin
+                ? 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'
+                : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {event.joined ? <><Check size={14} /> 已加入饭局</> : <><LogIn size={14} /> 加入饭局</>}
+          </button>
         </div>
       </div>
     );
