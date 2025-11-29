@@ -135,8 +135,6 @@ export default function LunchBuddyApp() {
     size: '随意',
     time: '随意',
     location: '随意',
-    targetType: 'all',
-    targetIds: [],
     hideFood: false,
     hideLocation: false
   });
@@ -298,8 +296,6 @@ export default function LunchBuddyApp() {
       size: '随意',
       time: '随意',
       location: '随意',
-      targetType: 'all',
-      targetIds: [],
       hideFood: false,
       hideLocation: false
     };
@@ -314,8 +310,6 @@ export default function LunchBuddyApp() {
       size: '随意',
       time: '随意',
       location: '随意',
-      targetType: 'all',
-      targetIds: [],
       hideFood: false,
       hideLocation: false
     });
@@ -323,10 +317,6 @@ export default function LunchBuddyApp() {
   };
 
   const confirmPublishStatus = () => {
-    if (lunchDetails.targetType === 'specific' && lunchDetails.targetIds.length === 0) {
-      alert('请至少选择一位朋友');
-      return;
-    }
     setMyStatus('active');
     setShowStatusConfig(false);
     checkForPerfectMatch(lunchDetails);
@@ -363,11 +353,6 @@ export default function LunchBuddyApp() {
   };
 
   const handleStopStatus = () => setMyStatus(null);
-  const toggleFriendSelection = (id) =>
-    setLunchDetails((p) => {
-      const ids = p.targetIds;
-      return { ...p, targetIds: ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id] };
-    });
   const togglePrivacy = (field) => setLunchDetails((p) => ({ ...p, [field]: !p[field] }));
   const initiateDateFriend = (f) => {
     setFriendToDate(f);
@@ -501,63 +486,6 @@ export default function LunchBuddyApp() {
             </button>
           </div>
           <div className="p-6 -mt-4 bg-white rounded-t-3xl space-y-5 flex-1 overflow-y-auto">
-            <div className="space-y-3 pb-4 border-b border-gray-100">
-              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <Eye size={16} className="text-gray-500" /> 谁可以看到
-              </label>
-              <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setLunchDetails({ ...lunchDetails, targetType: 'all' })}
-                  className={`flex-1 py-2 text-sm rounded-lg font-medium transition-all ${
-                    lunchDetails.targetType === 'all' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  所有朋友
-                </button>
-                <button
-                  onClick={() => setLunchDetails({ ...lunchDetails, targetType: 'specific' })}
-                  className={`flex-1 py-2 text-sm rounded-lg font-medium transition-all ${
-                    lunchDetails.targetType === 'specific' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  指定朋友
-                </button>
-              </div>
-              {lunchDetails.targetType === 'specific' && (
-                <div className="grid grid-cols-4 gap-2 mt-2 animate-fade-in max-h-[180px] overflow-y-auto p-1 custom-scrollbar">
-                  {friends.map((friend) => {
-                    const isSelected = lunchDetails.targetIds.includes(friend.id);
-                    return (
-                      <div
-                        key={friend.id}
-                        onClick={() => toggleFriendSelection(friend.id)}
-                        className={`flex flex-col items-center gap-1 cursor-pointer p-2 rounded-xl border transition-all ${
-                          isSelected ? 'border-orange-200 bg-orange-50' : 'border-transparent hover:bg-gray-50'
-                        }`}
-                      >
-                        <div
-                          className={`w-10 h-10 rounded-full ${friend.avatarColor} flex items-center justify-center text-white text-sm relative`}
-                        >
-                          {friend.nickname[0]}{' '}
-                          {isSelected && (
-                            <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
-                              <CheckCircle2 size={10} color="white" />
-                            </div>
-                          )}
-                        </div>
-                        <span
-                          className={`text-[10px] truncate w-full text-center ${
-                            isSelected ? 'text-orange-600 font-bold' : 'text-gray-500'
-                          }`}
-                        >
-                          {friend.nickname}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -837,9 +765,8 @@ export default function LunchBuddyApp() {
 
     if (myStatus === 'active') {
       activeFriends.forEach((friend) => {
-        const isTargeted = lunchDetails.targetType === 'all' || lunchDetails.targetIds.includes(friend.id);
         const isPlanMatch = checkIsMatch(lunchDetails, friend.lunchPlan);
-        if (isPlanMatch && isTargeted) matchedFriends.push(friend);
+        if (isPlanMatch) matchedFriends.push(friend);
         else otherFriends.push(friend);
       });
     }
@@ -884,7 +811,7 @@ export default function LunchBuddyApp() {
                     </div>
                   </div>
                   <div className="mt-2 pt-2 border-t border-orange-100 text-xs text-orange-400 flex items-center gap-1">
-                    <Eye size={12} /> {lunchDetails.targetType === 'all' ? '对所有朋友可见' : `仅 ${lunchDetails.targetIds.length} 位朋友可见`}
+                    <Eye size={12} /> 对所有朋友可见
                   </div>
                 </div>
                 <div className="w-12 h-12 rounded-full flex items-center justify-center ml-2 bg-orange-500 shadow-md relative group">
