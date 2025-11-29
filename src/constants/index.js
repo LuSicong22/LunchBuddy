@@ -3,8 +3,8 @@ export const RANDOM_NICKNAMES = ['干饭王', '碳水教父', '奶茶脑袋', '�
 export const INITIAL_OPEN_EVENTS = [
   {
     id: 'ab_confirmed_table',
-    title: '产品阿强 x Java老哥 的饭局',
-    description: 'A 主动邀了 B，B 偏好 2 人以上，饭局对好友开放拼桌',
+    title: '产品阿强 x Java老哥 的饭群',
+    description: 'A 主动邀了 B，B 偏好 2 人以上，饭群对好友开放拼桌',
     sizePreference: '3-4人',
     food: '日料 + 湘味混搭',
     time: '12:10',

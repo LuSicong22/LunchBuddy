@@ -309,6 +309,12 @@ export default function LunchBuddyApp() {
   const handlePartnerAccept = () => {
     if (!friendToDate) return;
     const finalPlan = friendToDate.lunchPlan || lunchDetails;
+    const participantEntries = [
+      { friendId: null, role: '我', isSelf: true },
+      { friendId: friendToDate.id, role: '朋友' }
+    ];
+    const mappedParticipants = mapParticipantsWithProfiles(participantEntries);
+    const isGroup = isGroupDining(finalPlan.size);
     const newDining = {
       partner: friendToDate,
       food: finalPlan.food || '随意',
@@ -316,7 +322,10 @@ export default function LunchBuddyApp() {
       location: finalPlan.location || '待定',
       size: finalPlan.size || '2人',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isAcknowledged: false
+      isAcknowledged: false,
+      isGroup,
+      participants: mappedParticipants,
+      title: `${userProfile?.nickname || '我'} x ${friendToDate.nickname} 的${isGroup ? '饭群' : '饭局'}`
     };
     setConfirmedDining(newDining);
     setMyStatus(null);
@@ -348,9 +357,38 @@ export default function LunchBuddyApp() {
     return chk(my.food, fr.food) && chk(my.time, fr.time) && chk(my.location, fr.location);
   };
 
+  const parseMaxSize = (sizeText) => {
+    const numbers = (sizeText || '').match(/\d+/g);
+    if (!numbers) return null;
+    return Math.max(...numbers.map(Number));
+  };
+
+  const isGroupDining = (input) => {
+    if (!input) return false;
+    const sizeText = typeof input === 'string' ? input : input.sizePreference || input.size;
+    const maxSize = parseMaxSize(sizeText);
+    if (maxSize) return maxSize > 2;
+    if (typeof input === 'object' && input.participants) return input.participants.length > 2;
+    return false;
+  };
+
+  const mapParticipantsWithProfiles = (participants) =>
+    participants.map((p, idx) => {
+      const profile = getParticipantProfile(p);
+      const nickname = p.isSelf ? userProfile?.nickname || '我' : profile?.nickname || p.name || '嘉宾';
+      const avatarColor = p.isSelf ? 'bg-emerald-500' : profile?.avatarColor || 'bg-gray-300';
+      return {
+        id: profile?.id ?? `guest-${idx}`,
+        nickname,
+        avatarColor,
+        role: p.role
+      };
+    });
+
   const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
   const eventHasFriend = (event) => event.participants.some((p) => !!getParticipantProfile(p));
   const handleJoinOpenEvent = (eventId) => {
+    let joinedEvent = null;
     setOpenDiningEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId || event.joined) return event;
@@ -359,23 +397,37 @@ export default function LunchBuddyApp() {
           role: `${userProfile?.nickname || '我'} 已加入`,
           isSelf: true
         };
-        return { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+        joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+        return joinedEvent;
       })
     );
+
+    if (joinedEvent) {
+      const participants = mapParticipantsWithProfiles(joinedEvent.participants);
+      setConfirmedDining({
+        ...joinedEvent,
+        food: joinedEvent.food || '随意',
+        time: joinedEvent.time || '待定',
+        location: joinedEvent.location || '待定',
+        size: joinedEvent.sizePreference,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isGroup: isGroupDining(joinedEvent),
+        isAcknowledged: true,
+        participants,
+        title: joinedEvent.title || '好友饭群'
+      });
+      setMyStatus(null);
+      setDiningViewMode('me');
+      setActiveTab('home');
+    }
   };
 
   const OpenDiningCard = ({ event }) => {
     const canJoin = eventHasFriend(event);
-    const participants = event.participants.map((p, idx) => {
-      const profile = getParticipantProfile(p);
-      return {
-        id: profile?.id ?? `guest-${idx}`,
-        nickname: p.isSelf ? userProfile?.nickname || '我' : profile?.nickname || p.name || '嘉宾',
-        avatarColor: p.isSelf ? 'bg-emerald-500' : profile?.avatarColor || 'bg-gray-300'
-      };
-    });
-
+    const participants = mapParticipantsWithProfiles(event.participants);
+    const isGroup = isGroupDining(event);
     const badgeText = event.joined ? '已加入' : canJoin ? '可加入' : '等待好友';
+    const eventLabel = isGroup ? '饭群' : '饭局';
 
     return (
       <div className="bg-gradient-to-br from-orange-50 to-white rounded-2xl p-4 shadow-md border border-orange-100 animate-slide-up relative overflow-hidden mb-4">
@@ -416,11 +468,11 @@ export default function LunchBuddyApp() {
               event.joined
                 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                 : canJoin
-                ? 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'
-                : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+              ? 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'
+              : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {event.joined ? <><Check size={14} /> 已加入饭局</> : <><LogIn size={14} /> 加入饭局</>}
+            {event.joined ? <><Check size={14} /> 已加入{eventLabel}</> : <><LogIn size={14} /> 加入{eventLabel}</>}
           </button>
         </div>
       </div>
@@ -495,55 +547,104 @@ export default function LunchBuddyApp() {
 
   const HomeView = () => {
     const visibleOpenEvents = openDiningEvents.filter((event) => eventHasFriend(event));
+    const hasGroupEvents = visibleOpenEvents.some((event) => isGroupDining(event));
+    const openDiningTitle = hasGroupEvents ? '好友在场的开放饭局 / 饭群' : '好友在场的开放饭局';
     if (confirmedDining) {
       return (
         <div className="flex flex-col h-full bg-orange-50">
           <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">当前饭局</h1>
-            <button
-              onClick={() => setDiningViewMode(diningViewMode === 'me' ? 'partner' : 'me')}
-              className="flex items-center gap-1 text-xs bg-white/50 px-2 py-1 rounded-full text-gray-500 hover:bg-white transition-colors"
-            >
-              <RefreshCw size={12} /> {diningViewMode === 'me' ? '模拟对方视角' : '返回我的视角'}
-            </button>
+            <h1 className="text-2xl font-bold text-gray-800">当前{confirmedDining.isGroup ? '饭群' : '饭局'}</h1>
+            {confirmedDining.isGroup ? (
+              <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">多人饭群</div>
+            ) : (
+              <button
+                onClick={() => setDiningViewMode(diningViewMode === 'me' ? 'partner' : 'me')}
+                className="flex items-center gap-1 text-xs bg-white/50 px-2 py-1 rounded-full text-gray-500 hover:bg-white transition-colors"
+              >
+                <RefreshCw size={12} /> {diningViewMode === 'me' ? '模拟对方视角' : '返回我的视角'}
+              </button>
+            )}
           </div>
-          <div className="flex-1 p-6 flex flex-col items-center justify-center">
-            <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative">
-              <div className="bg-gradient-to-r from-orange-400 to-red-500 h-24 relative flex items-center justify-center">
-                <h2 className="text-white font-bold text-2xl drop-shadow-md">{diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
-                <div className="absolute -bottom-10 flex gap-4">
-                  <div className="w-20 h-20 rounded-full bg-gray-200 border-4 border-white shadow-md overflow-hidden">
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white font-bold text-2xl">我</div>
-                  </div>
-                  <div
-                    className={`w-20 h-20 rounded-full ${confirmedDining.partner.avatarColor} border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-2xl`}
-                  >
-                    {diningViewMode === 'me' ? confirmedDining.partner.nickname[0] : '我'}
-                  </div>
+          <div className="flex-1 p-5 pt-3 flex flex-col items-center overflow-y-auto">
+            <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative max-h-[calc(100vh-190px)]">
+              <div className="bg-gradient-to-r from-orange-400 to-red-500 h-20 relative flex items-center justify-center">
+                <h2 className="text-white font-bold text-2xl drop-shadow-md">{confirmedDining.isGroup ? '饭群已确认 🎉' : diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
+                <div className="absolute -bottom-10 flex gap-3 justify-center w-full px-4">
+                  {confirmedDining.isGroup ? (
+                    <div className="flex -space-x-3 bg-white/20 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm">
+                      {confirmedDining.participants?.slice(0, 4).map((p, idx) => (
+                        <div
+                          key={p.id}
+                          className={`w-12 h-12 rounded-full ${p.avatarColor} border-2 border-white flex items-center justify-center text-white font-bold text-lg shadow-sm z-[${
+                            10 - idx
+                          }]`}
+                        >
+                          {p.nickname[0]}
+                        </div>
+                      ))}
+                      {confirmedDining.participants?.length > 4 && (
+                        <div className="w-12 h-12 rounded-full bg-white/70 border-2 border-white flex items-center justify-center text-gray-500 text-sm font-bold shadow-sm">
+                          +{confirmedDining.participants.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <div className="w-20 h-20 rounded-full bg-gray-200 border-4 border-white shadow-md overflow-hidden">
+                        <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white font-bold text-2xl">我</div>
+                      </div>
+                      <div
+                        className={`w-20 h-20 rounded-full ${confirmedDining.partner.avatarColor} border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-2xl`}
+                      >
+                        {diningViewMode === 'me' ? confirmedDining.partner.nickname[0] : '我'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="pt-14 pb-8 px-6 text-center space-y-6">
-                <div>
-                  <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">PARTNER</p>
-                  <p className="text-gray-800 font-bold text-lg">{diningViewMode === 'me' ? confirmedDining.partner.nickname : '我'}</p>
-                  <div className="mt-2">
-                    {confirmedDining.isAcknowledged ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                        <CheckCircle2 size={12} /> {diningViewMode === 'me' ? '对方已确认收到' : '我已确认收到'}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-500 bg-orange-50 px-3 py-1 rounded-full animate-pulse">
-                        <Clock size={12} /> {diningViewMode === 'me' ? '等待对方确认收到...' : '等待我确认收到...'}
-                      </span>
-                    )}
+              <div className="pt-12 pb-6 px-6 text-center space-y-5">
+                {confirmedDining.isGroup ? (
+                  <div className="space-y-3">
+                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">饭群</p>
+                    <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭群'}</p>
+                    <div className="flex flex-wrap justify-center gap-2 max-h-24 overflow-y-auto px-2">
+                      {confirmedDining.participants?.map((p) => (
+                        <span key={p.id} className="inline-flex items-center gap-1 bg-gray-50 text-gray-700 px-2 py-1 rounded-full text-xs">
+                          <span className={`w-6 h-6 rounded-full ${p.avatarColor} text-white flex items-center justify-center text-[10px] font-bold`}>
+                            {p.nickname[0]}
+                          </span>
+                          <span className="font-medium">{p.nickname}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">PARTNER</p>
+                    <p className="text-gray-800 font-bold text-lg">{diningViewMode === 'me' ? confirmedDining.partner.nickname : '我'}</p>
+                    <div className="mt-2">
+                      {confirmedDining.isAcknowledged ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                          <CheckCircle2 size={12} /> {diningViewMode === 'me' ? '对方已确认收到' : '我已确认收到'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-500 bg-orange-50 px-3 py-1 rounded-full animate-pulse">
+                          <Clock size={12} /> {diningViewMode === 'me' ? '等待对方确认收到...' : '等待我确认收到...'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-orange-50 p-3 rounded-xl">
                     <Utensils className="mx-auto text-orange-500 mb-1" size={20} />
                     <p className="text-xs text-gray-400">吃什么</p>
                     <p className="font-bold text-gray-800">
-                      {confirmedDining.partner.lunchPlan?.hideFood && diningViewMode === 'me' ? '🤫 秘密' : confirmedDining.food}
+                      {confirmedDining.isGroup
+                        ? confirmedDining.food
+                        : confirmedDining.partner.lunchPlan?.hideFood && diningViewMode === 'me'
+                        ? '🤫 秘密'
+                        : confirmedDining.food}
                     </p>
                   </div>
                   <div className="bg-green-50 p-3 rounded-xl">
@@ -555,17 +656,28 @@ export default function LunchBuddyApp() {
                     <MapPin className="mx-auto text-purple-500 mb-1" size={20} />
                     <p className="text-xs text-gray-400">地点</p>
                     <p className="font-bold text-gray-800">
-                      {confirmedDining.partner.lunchPlan?.hideLocation && diningViewMode === 'me' ? '🤫 秘密' : confirmedDining.location}
+                      {confirmedDining.isGroup
+                        ? confirmedDining.location
+                        : confirmedDining.partner.lunchPlan?.hideLocation && diningViewMode === 'me'
+                        ? '🤫 秘密'
+                        : confirmedDining.location}
                     </p>
                   </div>
                   <div className="bg-blue-50 p-3 rounded-xl">
                     <Users className="mx-auto text-blue-500 mb-1" size={20} />
                     <p className="text-xs text-gray-400">人数</p>
-                    <p className="font-bold text-gray-800">{confirmedDining.size}</p>
+                    <p className="font-bold text-gray-800">{confirmedDining.size || `${confirmedDining.participants?.length || 0}人`}</p>
                   </div>
                 </div>
-                <div className="pt-4 border-t border-gray-100">
-                  {diningViewMode === 'me' ? (
+                <div className="pt-3 border-t border-gray-100">
+                  {confirmedDining.isGroup ? (
+                    <>
+                      <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
+                      <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
+                        取消/结束饭群
+                      </button>
+                    </>
+                  ) : diningViewMode === 'me' ? (
                     <>
                       <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
@@ -688,7 +800,7 @@ export default function LunchBuddyApp() {
             <div className="space-y-3 mb-6">
               <div className="flex items-center gap-2 px-1">
                 <CalendarCheck className="text-orange-500" size={18} />
-                <h2 className="font-bold text-gray-800">好友在场的开放饭局</h2>
+                <h2 className="font-bold text-gray-800">{openDiningTitle}</h2>
                 <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">{visibleOpenEvents.length}</span>
               </div>
               <div className="space-y-3">
@@ -1138,7 +1250,7 @@ export default function LunchBuddyApp() {
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCancelDiningModal(false)}></div>
             <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 animate-bounce-in">
               <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-red-500">
-                <MessageSquare size={20} />取消饭局
+                <MessageSquare size={20} />取消{confirmedDining?.isGroup ? '饭群' : '饭局'}
               </h3>
               <p className="text-sm text-gray-500 mb-4">请填写原因，让朋友知道为什么取消：</p>
               <textarea
