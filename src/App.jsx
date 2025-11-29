@@ -421,7 +421,7 @@ export default function LunchBuddyApp() {
       isAcknowledged: false,
       isGroup,
       participants: mappedParticipants,
-      title: `${userProfile?.nickname || '我'} x ${friendToDate.nickname} 的${isGroup ? '饭群' : '饭局'}`
+      title: `${userProfile?.nickname || '我'} x ${friendToDate.nickname} 的饭局`
     };
     setConfirmedDining(newDining);
     setMyStatus(null);
@@ -444,6 +444,31 @@ export default function LunchBuddyApp() {
     if (!cancelReason.trim()) return;
     if (confirmedDining?.partner) setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
     setConfirmedDining(null);
+    setShowCancelDiningModal(false);
+    setCancelReason('');
+  };
+
+  const handleExitDining = () => {
+    const confirmedId = confirmedDining?.id;
+    const isFromOpenEvent = Boolean(confirmedId);
+    if (!window.confirm('确定要退出当前饭局吗？')) return;
+
+    if (confirmedDining?.partner) {
+      setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
+    }
+
+    if (isFromOpenEvent) {
+      setOpenDiningEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== confirmedId) return event;
+          const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
+          return { ...event, joined: false, participants: filteredParticipants };
+        })
+      );
+    }
+
+    setConfirmedDining(null);
+    setDiningViewMode('me');
     setShowCancelDiningModal(false);
     setCancelReason('');
   };
@@ -483,39 +508,34 @@ export default function LunchBuddyApp() {
 
   const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
   const eventHasFriend = (event) => event.participants.some((p) => !!getParticipantProfile(p));
-  const handleJoinOpenEvent = (eventId) => {
-    let joinedEvent = null;
-    setOpenDiningEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId || event.joined) return event;
-        const selfParticipant = {
-          friendId: null,
-          role: `${userProfile?.nickname || '我'} 已加入`,
-          isSelf: true
-        };
-        joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
-        return joinedEvent;
-      })
-    );
+  const handleJoinOpenEvent = (event) => {
+    if (event.joined || !eventHasFriend(event)) return;
 
-    if (joinedEvent) {
-      const participants = mapParticipantsWithProfiles(joinedEvent.participants);
-      setConfirmedDining({
-        ...joinedEvent,
-        food: joinedEvent.food || '随意',
-        time: joinedEvent.time || '待定',
-        location: joinedEvent.location || '待定',
-        size: joinedEvent.sizePreference,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isGroup: isGroupDining(joinedEvent),
-        isAcknowledged: true,
-        participants,
-        title: joinedEvent.title || '好友饭群'
-      });
-      setMyStatus(null);
-      setDiningViewMode('me');
-      setActiveTab('home');
-    }
+    const selfParticipant = {
+      friendId: null,
+      role: `${userProfile?.nickname || '我'} 已加入`,
+      isSelf: true
+    };
+    const joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+
+    setOpenDiningEvents((prev) => prev.map((item) => (item.id === event.id ? joinedEvent : item)));
+
+    const participants = mapParticipantsWithProfiles(joinedEvent.participants);
+    setConfirmedDining({
+      ...joinedEvent,
+      food: joinedEvent.food || '随意',
+      time: joinedEvent.time || '待定',
+      location: joinedEvent.location || '待定',
+      size: joinedEvent.sizePreference,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isGroup: isGroupDining(joinedEvent),
+      isAcknowledged: true,
+      participants,
+      title: joinedEvent.title || '好友饭局'
+    });
+    setMyStatus(null);
+    setDiningViewMode('me');
+    setActiveTab('home');
   };
 
   const OpenDiningCard = ({ event }) => {
@@ -523,7 +543,7 @@ export default function LunchBuddyApp() {
     const participants = mapParticipantsWithProfiles(event.participants);
     const isGroup = isGroupDining(event);
     const badgeText = event.joined ? '已加入' : canJoin ? '可加入' : '等待好友';
-    const eventLabel = isGroup ? '饭群' : '饭局';
+    const eventLabel = isGroup ? '多人饭局' : '饭局';
 
     return (
       <div className="bg-gradient-to-br from-orange-50 to-white rounded-2xl p-4 shadow-md border border-orange-100 animate-slide-up relative overflow-hidden mb-4">
@@ -558,7 +578,7 @@ export default function LunchBuddyApp() {
             <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.sizePreference}</span>
           </div>
           <button
-            onClick={() => handleJoinOpenEvent(event.id)}
+            onClick={() => handleJoinOpenEvent(event)}
             disabled={!canJoin || event.joined}
             className={`w-full py-2 mt-1 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border transition-colors ${
               event.joined
@@ -644,14 +664,14 @@ export default function LunchBuddyApp() {
   const HomeView = () => {
     const visibleOpenEvents = openDiningEvents.filter((event) => eventHasFriend(event));
     const hasGroupEvents = visibleOpenEvents.some((event) => isGroupDining(event));
-    const openDiningTitle = hasGroupEvents ? '好友在场的开放饭局 / 饭群' : '好友在场的开放饭局';
+    const openDiningTitle = hasGroupEvents ? '好友在场的开放饭局（含多人局）' : '好友在场的开放饭局';
     if (confirmedDining) {
       return (
         <div className="flex flex-col h-full bg-orange-50">
           <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">当前{confirmedDining.isGroup ? '饭群' : '饭局'}</h1>
+            <h1 className="text-2xl font-bold text-gray-800">当前饭局</h1>
             {confirmedDining.isGroup ? (
-              <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">多人饭群</div>
+              <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">多人饭局</div>
             ) : (
               <button
                 onClick={() => setDiningViewMode(diningViewMode === 'me' ? 'partner' : 'me')}
@@ -664,7 +684,7 @@ export default function LunchBuddyApp() {
           <div className="flex-1 p-5 pt-3 flex flex-col items-center overflow-y-auto">
             <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative max-h-[calc(100vh-190px)]">
               <div className="bg-gradient-to-r from-orange-400 to-red-500 h-20 relative flex items-center justify-center">
-                <h2 className="text-white font-bold text-2xl drop-shadow-md">{confirmedDining.isGroup ? '饭群已确认 🎉' : diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
+                <h2 className="text-white font-bold text-2xl drop-shadow-md">{confirmedDining.isGroup ? '多人饭局已确认 🎉' : diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
                 <div className="absolute -bottom-10 flex gap-3 justify-center w-full px-4">
                   {confirmedDining.isGroup ? (
                     <div className="flex -space-x-3 bg-white/20 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm">
@@ -701,8 +721,8 @@ export default function LunchBuddyApp() {
               <div className="pt-12 pb-6 px-6 text-center space-y-5">
                 {confirmedDining.isGroup ? (
                   <div className="space-y-3">
-                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">饭群</p>
-                    <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭群'}</p>
+                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">多人饭局</p>
+                    <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭局'}</p>
                     <div className="flex flex-wrap justify-center gap-2 max-h-24 overflow-y-auto px-2">
                       {confirmedDining.participants?.map((p) => (
                         <span key={p.id} className="inline-flex items-center gap-1 bg-gray-50 text-gray-700 px-2 py-1 rounded-full text-xs">
@@ -768,14 +788,20 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                        <span>生成时间: {confirmedDining.timestamp}</span>
+                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
+                      </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
-                        取消/结束饭群
+                        取消/结束饭局
                       </button>
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                        <span>生成时间: {confirmedDining.timestamp}</span>
+                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
+                      </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
                       </button>
@@ -1397,7 +1423,7 @@ export default function LunchBuddyApp() {
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCancelDiningModal(false)}></div>
             <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 animate-bounce-in">
               <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-red-500">
-                <MessageSquare size={20} />取消{confirmedDining?.isGroup ? '饭群' : '饭局'}
+                <MessageSquare size={20} />取消饭局
               </h3>
               <p className="text-sm text-gray-500 mb-4">请填写原因，让朋友知道为什么取消：</p>
               <textarea
