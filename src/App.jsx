@@ -1261,7 +1261,7 @@ export default function LunchBuddyApp() {
                   {installPromptEvent
                     ? '安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。'
                     : isIos
-                      ? '在 Safari 底部的分享菜单中选择 “添加到主屏幕”，即可快速打开 LunchBuddy。'
+                      ? '在浏览器底部的分享菜单中选择 “添加到主屏幕”，即可快速打开 LunchBuddy。'
                       : '在浏览器菜单中选择 “添加到主屏幕/安装应用”，即可更方便地启动 LunchBuddy。'}
                 </p>
                 {showInstallGuide && !installPromptEvent && (
@@ -1269,7 +1269,7 @@ export default function LunchBuddyApp() {
                     <p className="font-semibold text-gray-800 mb-1">添加步骤：</p>
                     {isIos ? (
                       <ol className="list-decimal list-inside space-y-1">
-                        <li>点击 Safari 底部的分享图标</li>
+                        <li>点击浏览器底部的分享图标</li>
                         <li>选择 “添加到主屏幕”</li>
                         <li>点击右上角 “添加” 完成安装</li>
                       </ol>
