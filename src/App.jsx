@@ -403,39 +403,34 @@ export default function LunchBuddyApp() {
 
   const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
   const eventHasFriend = (event) => event.participants.some((p) => !!getParticipantProfile(p));
-  const handleJoinOpenEvent = (eventId) => {
-    let joinedEvent = null;
-    setOpenDiningEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId || event.joined) return event;
-        const selfParticipant = {
-          friendId: null,
-          role: `${userProfile?.nickname || '我'} 已加入`,
-          isSelf: true
-        };
-        joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
-        return joinedEvent;
-      })
-    );
+  const handleJoinOpenEvent = (event) => {
+    if (event.joined || !eventHasFriend(event)) return;
 
-    if (joinedEvent) {
-      const participants = mapParticipantsWithProfiles(joinedEvent.participants);
-      setConfirmedDining({
-        ...joinedEvent,
-        food: joinedEvent.food || '随意',
-        time: joinedEvent.time || '待定',
-        location: joinedEvent.location || '待定',
-        size: joinedEvent.sizePreference,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isGroup: isGroupDining(joinedEvent),
-        isAcknowledged: true,
-        participants,
-        title: joinedEvent.title || '好友饭群'
-      });
-      setMyStatus(null);
-      setDiningViewMode('me');
-      setActiveTab('home');
-    }
+    const selfParticipant = {
+      friendId: null,
+      role: `${userProfile?.nickname || '我'} 已加入`,
+      isSelf: true
+    };
+    const joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+
+    setOpenDiningEvents((prev) => prev.map((item) => (item.id === event.id ? joinedEvent : item)));
+
+    const participants = mapParticipantsWithProfiles(joinedEvent.participants);
+    setConfirmedDining({
+      ...joinedEvent,
+      food: joinedEvent.food || '随意',
+      time: joinedEvent.time || '待定',
+      location: joinedEvent.location || '待定',
+      size: joinedEvent.sizePreference,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isGroup: isGroupDining(joinedEvent),
+      isAcknowledged: true,
+      participants,
+      title: joinedEvent.title || '好友饭群'
+    });
+    setMyStatus(null);
+    setDiningViewMode('me');
+    setActiveTab('home');
   };
 
   const OpenDiningCard = ({ event }) => {
@@ -478,7 +473,7 @@ export default function LunchBuddyApp() {
             <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.sizePreference}</span>
           </div>
           <button
-            onClick={() => handleJoinOpenEvent(event.id)}
+            onClick={() => handleJoinOpenEvent(event)}
             disabled={!canJoin || event.joined}
             className={`w-full py-2 mt-1 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border transition-colors ${
               event.joined
