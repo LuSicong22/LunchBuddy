@@ -360,6 +360,27 @@ export default function LunchBuddyApp() {
     setCancelReason('');
     setShowCancelDiningModal(true);
   };
+
+  const handleLeaveDining = () => {
+    if (confirmedDining?.id) {
+      setOpenDiningEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== confirmedDining.id) return event;
+          const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
+          return { ...event, joined: false, participants: filteredParticipants };
+        })
+      );
+    }
+
+    if (confirmedDining?.partner) {
+      setFriends((prev) =>
+        prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f))
+      );
+    }
+
+    setConfirmedDining(null);
+    setDiningViewMode('me');
+  };
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) return;
     if (confirmedDining?.partner) setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
@@ -403,39 +424,34 @@ export default function LunchBuddyApp() {
 
   const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
   const eventHasFriend = (event) => event.participants.some((p) => !!getParticipantProfile(p));
-  const handleJoinOpenEvent = (eventId) => {
-    let joinedEvent = null;
-    setOpenDiningEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId || event.joined) return event;
-        const selfParticipant = {
-          friendId: null,
-          role: `${userProfile?.nickname || '我'} 已加入`,
-          isSelf: true
-        };
-        joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
-        return joinedEvent;
-      })
-    );
+  const handleJoinOpenEvent = (event) => {
+    if (event.joined || !eventHasFriend(event)) return;
 
-    if (joinedEvent) {
-      const participants = mapParticipantsWithProfiles(joinedEvent.participants);
-      setConfirmedDining({
-        ...joinedEvent,
-        food: joinedEvent.food || '随意',
-        time: joinedEvent.time || '待定',
-        location: joinedEvent.location || '待定',
-        size: joinedEvent.sizePreference,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isGroup: isGroupDining(joinedEvent),
-        isAcknowledged: true,
-        participants,
-        title: joinedEvent.title || '好友饭群'
-      });
-      setMyStatus(null);
-      setDiningViewMode('me');
-      setActiveTab('home');
-    }
+    const selfParticipant = {
+      friendId: null,
+      role: `${userProfile?.nickname || '我'} 已加入`,
+      isSelf: true
+    };
+    const joinedEvent = { ...event, joined: true, participants: [...event.participants, selfParticipant] };
+
+    setOpenDiningEvents((prev) => prev.map((item) => (item.id === event.id ? joinedEvent : item)));
+
+    const participants = mapParticipantsWithProfiles(joinedEvent.participants);
+    setConfirmedDining({
+      ...joinedEvent,
+      food: joinedEvent.food || '随意',
+      time: joinedEvent.time || '待定',
+      location: joinedEvent.location || '待定',
+      size: joinedEvent.sizePreference,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isGroup: isGroupDining(joinedEvent),
+      isAcknowledged: true,
+      participants,
+      title: joinedEvent.title || '好友饭群'
+    });
+    setMyStatus(null);
+    setDiningViewMode('me');
+    setActiveTab('home');
   };
 
   const OpenDiningCard = ({ event }) => {
@@ -478,7 +494,7 @@ export default function LunchBuddyApp() {
             <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-md font-medium">{event.sizePreference}</span>
           </div>
           <button
-            onClick={() => handleJoinOpenEvent(event.id)}
+            onClick={() => handleJoinOpenEvent(event)}
             disabled={!canJoin || event.joined}
             className={`w-full py-2 mt-1 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border transition-colors ${
               event.joined
@@ -687,19 +703,41 @@ export default function LunchBuddyApp() {
                 </div>
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
-                    <>
-                      <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
-                      <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
-                        取消/结束饭群
-                      </button>
-                    </>
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">生成时间: {confirmedDining.timestamp}</p>
+                      <div className="space-y-2">
+                        <button
+                          onClick={handleLeaveDining}
+                          className="w-full py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"
+                        >
+                          退出饭群
+                        </button>
+                        <button
+                          onClick={handleInitiateCancel}
+                          className="w-full py-3 bg-gradient-to-r from-red-50 to-orange-50 text-red-500 border border-red-100 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"
+                        >
+                          取消/结束饭群
+                        </button>
+                      </div>
+                    </div>
                   ) : diningViewMode === 'me' ? (
-                    <>
-                      <p className="text-xs text-gray-400 mb-2">生成时间: {confirmedDining.timestamp}</p>
-                      <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
-                        取消/结束饭局
-                      </button>
-                    </>
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">生成时间: {confirmedDining.timestamp}</p>
+                      <div className="space-y-2">
+                        <button
+                          onClick={handleLeaveDining}
+                          className="w-full py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"
+                        >
+                          退出饭局
+                        </button>
+                        <button
+                          onClick={handleInitiateCancel}
+                          className="w-full py-3 bg-gradient-to-r from-red-50 to-orange-50 text-red-500 border border-red-100 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"
+                        >
+                          取消/结束饭局
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {!confirmedDining.isAcknowledged ? (
