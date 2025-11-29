@@ -34,8 +34,10 @@ import { doc, getFirestore, onSnapshot, setDoc, updateDoc } from 'firebase/fires
 import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES } from './constants';
 import { NotificationOverlay } from './components/NotificationOverlay';
 import { Navigation } from './components/Navigation';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { StatusConfigModal } from './components/modals/StatusConfigModal';
 import { useFriends } from './hooks/useFriends';
+import { usePWAInstallPrompt } from './hooks/usePWAInstallPrompt';
 import { copyToClipboard } from './utils/clipboard';
 import { generateShortId } from './utils/id';
 
@@ -121,6 +123,8 @@ export default function LunchBuddyApp() {
   const [notification, setNotification] = useState(null);
 
   const [openDiningEvents, setOpenDiningEvents] = useState(INITIAL_OPEN_EVENTS);
+  const { shouldShowInstallPrompt, promptInstall, isIOS, hasNativePrompt } = usePWAInstallPrompt();
+  const [hideInstallPrompt, setHideInstallPrompt] = useState(false);
 
   useEffect(() => {
     if (!auth || !db) {
@@ -180,6 +184,15 @@ export default function LunchBuddyApp() {
 
     return () => unsubscribe();
   }, []);
+
+  const installPromptVisible = shouldShowInstallPrompt && !hideInstallPrompt;
+
+  const handleInstallClick = async () => {
+    const accepted = await promptInstall();
+    if (!accepted && !hasNativePrompt && !isIOS) {
+      alert('请在浏览器菜单中选择“添加到主屏幕”完成安装，以获得最佳体验。');
+    }
+  };
 
   const triggerNotification = (title, body, type, payload = {}) => {
     setNotification({ title, body, type, payload });
@@ -1164,6 +1177,14 @@ export default function LunchBuddyApp() {
   return (
     <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
       <div className="w-full max-w-md bg-white h-[100dvh] overflow-hidden relative shadow-2xl flex flex-col">
+        {installPromptVisible && (
+          <PWAInstallPrompt
+            isIOS={isIOS}
+            hasNativePrompt={hasNativePrompt}
+            onInstallClick={handleInstallClick}
+            onDismiss={() => setHideInstallPrompt(true)}
+          />
+        )}
         <div className="flex-1 overflow-hidden relative">
           {activeTab === 'home' && <HomeView />}
           {activeTab === 'friends' && <FriendsView />}
