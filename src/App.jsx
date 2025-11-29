@@ -645,47 +645,36 @@ export default function LunchBuddyApp() {
     });
 
     return (
-      <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-white border border-orange-100 rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="space-y-1">
-            <p className="text-xs text-orange-500 font-bold inline-flex items-center gap-1">
-              <BellRing size={14} /> 已确认饭局 · 接受加入
-            </p>
-            <h3 className="text-lg font-bold text-gray-800 leading-tight">{event.title}</h3>
-            <p className="text-xs text-gray-500">{event.description}</p>
-          </div>
-          <span className="text-[10px] bg-white text-orange-500 px-2 py-1 rounded-full border border-orange-200 font-bold whitespace-nowrap">
+          <h3 className="text-lg font-bold text-gray-800 leading-tight">{event.title}</h3>
+          <span className="text-[11px] bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100 font-bold whitespace-nowrap">
             {event.sizePreference}
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">{participantBadges}</div>
-        <div className="grid grid-cols-3 gap-3 text-xs text-gray-600">
-          <div className="bg-white rounded-xl p-3 border border-orange-100">
-            <Utensils size={14} className="text-orange-500 mb-1" />
-            <p className="font-bold text-gray-800">{event.food}</p>
+        <div className="grid grid-cols-3 gap-3 text-sm text-gray-700">
+          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
+            <Utensils size={16} className="text-orange-500" />
+            <span className="font-bold truncate">{event.food}</span>
           </div>
-          <div className="bg-white rounded-xl p-3 border border-orange-100">
-            <Clock size={14} className="text-green-500 mb-1" />
-            <p className="font-bold text-gray-800">{event.time}</p>
+          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
+            <Clock size={16} className="text-green-500" />
+            <span className="font-bold">{event.time}</span>
           </div>
-          <div className="bg-white rounded-xl p-3 border border-orange-100">
-            <MapPin size={14} className="text-purple-500 mb-1" />
-            <p className="font-bold text-gray-800 truncate">{event.location}</p>
+          <div className="flex items-center gap-2 bg-orange-50 rounded-xl p-3">
+            <MapPin size={16} className="text-purple-500" />
+            <span className="font-bold truncate">{event.location}</span>
           </div>
         </div>
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1 text-[11px] text-gray-500">
-            <Users size={12} className="text-orange-500" />
-            <span>至少一位好友在场，可自由加入</span>
-          </div>
+        <div className="flex justify-end">
           {canJoin ? (
             <button
               onClick={() => handleJoinOpenEvent(event.id)}
               disabled={event.joined}
-              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1 ${
+              className={`flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-colors gap-1 ${
                 event.joined
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                  : 'bg-gray-900 text-white hover:bg-black'
               }`}
             >
               {event.joined ? (
@@ -699,7 +688,7 @@ export default function LunchBuddyApp() {
               )}
             </button>
           ) : (
-            <span className="text-[11px] text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">暂无好友参与，无法加入</span>
+            <span className="text-[12px] text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">暂无好友参与</span>
           )}
         </div>
       </div>
