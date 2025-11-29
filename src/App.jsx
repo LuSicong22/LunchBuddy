@@ -125,6 +125,8 @@ export default function LunchBuddyApp() {
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   const installPromptDismissedKey = `lunchbuddy_install_prompt_dismissed_${appId}`;
 
@@ -136,6 +138,7 @@ export default function LunchBuddyApp() {
 
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
     const updateDisplayMode = () => setIsStandalone(mediaQuery.matches || window.navigator.standalone);
+    setIsIos(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
     updateDisplayMode();
 
     const handleBeforeInstallPrompt = (event) => {
@@ -163,6 +166,17 @@ export default function LunchBuddyApp() {
       else mediaQuery.removeListener(updateDisplayMode);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isStandalone || hasDismissedInstallPrompt()) return;
+
+    const timer = setTimeout(() => {
+      if (!installPromptEvent) setShowInstallPrompt(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [installPromptEvent, isStandalone]);
 
   useEffect(() => {
     if (!auth || !db) {
@@ -361,7 +375,7 @@ export default function LunchBuddyApp() {
 
   const handleInstallApp = async () => {
     if (!installPromptEvent) {
-      setShowInstallPrompt(false);
+      setShowInstallGuide((prev) => !prev);
       return;
     }
     installPromptEvent.prompt();
@@ -379,6 +393,7 @@ export default function LunchBuddyApp() {
     if (typeof window !== 'undefined') {
       localStorage.setItem(installPromptDismissedKey, '1');
     }
+    setShowInstallGuide(false);
     setShowInstallPrompt(false);
   };
   const handleSendInvite = () => setDatingStep('partner');
@@ -1243,14 +1258,36 @@ export default function LunchBuddyApp() {
               <div className="flex-1">
                 <p className="text-sm font-bold text-gray-800">添加到主屏幕</p>
                 <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。
+                  {installPromptEvent
+                    ? '安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。'
+                    : isIos
+                      ? '在 Safari 底部的分享菜单中选择 “添加到主屏幕”，即可快速打开 LunchBuddy。'
+                      : '在浏览器菜单中选择 “添加到主屏幕/安装应用”，即可更方便地启动 LunchBuddy。'}
                 </p>
+                {showInstallGuide && !installPromptEvent && (
+                  <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600 leading-relaxed">
+                    <p className="font-semibold text-gray-800 mb-1">添加步骤：</p>
+                    {isIos ? (
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>点击 Safari 底部的分享图标</li>
+                        <li>选择 “添加到主屏幕”</li>
+                        <li>点击右上角 “添加” 完成安装</li>
+                      </ol>
+                    ) : (
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>打开浏览器菜单（⋮/…）</li>
+                        <li>找到 “添加到主屏幕” 或 “安装应用”</li>
+                        <li>确认添加后即可从桌面打开 LunchBuddy</li>
+                      </ol>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={handleInstallApp}
                     className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform"
                   >
-                    立即添加
+                    {installPromptEvent ? '立即添加' : showInstallGuide ? '收起指引' : '查看指引'}
                   </button>
                   <button
                     onClick={handleDismissInstallPrompt}
