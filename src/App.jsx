@@ -57,6 +57,7 @@ if (firebaseConfig) {
 }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : import.meta.env.VITE_APP_ID || 'default-app-id';
+const localProfileStorageKey = `lunchbuddy_local_profile_${appId}`;
 
 export default function LunchBuddyApp() {
   const [user, setUser] = useState(null);
@@ -123,14 +124,20 @@ export default function LunchBuddyApp() {
 
   useEffect(() => {
     if (!auth || !db) {
-      const fallbackProfile = {
-        nickname: '离线食客',
-        avatarColor: 'bg-orange-500',
-        shortId: generateShortId()
-      };
       setUser({ uid: 'local-user' });
-      setUserProfile(fallbackProfile);
-      setEditedName(fallbackProfile.nickname);
+      if (typeof window !== 'undefined') {
+        const storedProfile = localStorage.getItem(localProfileStorageKey);
+        if (storedProfile) {
+          try {
+            const parsedProfile = JSON.parse(storedProfile);
+            setUserProfile(parsedProfile);
+            setEditedName(parsedProfile.nickname);
+          } catch (error) {
+            console.error('Failed to parse local profile', error);
+            localStorage.removeItem(localProfileStorageKey);
+          }
+        }
+      }
       setAuthLoading(false);
       return;
     }
@@ -210,6 +217,9 @@ export default function LunchBuddyApp() {
         avatarColor: 'bg-orange-500',
         shortId: generateShortId()
       };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(localProfileStorageKey, JSON.stringify(localProfile));
+      }
       setUserProfile(localProfile);
       setEditedName(localProfile.nickname);
       setIsRegistering(false);
@@ -234,7 +244,13 @@ export default function LunchBuddyApp() {
   const handleUpdateNickname = async () => {
     if (!editedName.trim() || !user) return;
     if (!db || !auth) {
-      setUserProfile((p) => ({ ...p, nickname: editedName }));
+      setUserProfile((p) => {
+        const updatedProfile = { ...p, nickname: editedName };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(localProfileStorageKey, JSON.stringify(updatedProfile));
+        }
+        return updatedProfile;
+      });
       setIsEditingName(false);
       return;
     }
