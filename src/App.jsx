@@ -293,26 +293,6 @@ export default function LunchBuddyApp() {
     }
   };
 
-  const handleAddFriend = () => {
-    if (!newFriendId.trim() || newFriendId.length !== 6) {
-      alert('请输入6位数字ID');
-      return;
-    }
-    const newFriend = {
-      id: Date.now(),
-      nickname: `用户_${newFriendId}`,
-      wechatId: 'unknown',
-      shortId: newFriendId,
-      note: '',
-      avatarColor: `bg-${['purple', 'indigo', 'teal', 'red'][Math.floor(Math.random() * 4)]}-500`,
-      status: 'active',
-      lunchPlan: { food: '随便吃点', size: '随意', time: '12:00', location: '附近', hideFood: false, hideLocation: false }
-    };
-    setFriends([...friends, newFriend]);
-    setNewFriendId('');
-    setShowAddFriendModal(false);
-  };
-
   const handleStopStatus = () => setMyStatus(null);
   const togglePrivacy = (field) => setLunchDetails((p) => ({ ...p, [field]: !p[field] }));
   const initiateDateFriend = (f) => {
@@ -365,22 +345,6 @@ export default function LunchBuddyApp() {
     if (!fr) return false;
     const chk = (a, b) => (!a || !b || a === '随意' || b === '随意' || a === '') ? true : a.includes(b) || b.includes(a);
     return chk(my.food, fr.food) && chk(my.time, fr.time) && chk(my.location, fr.location);
-  };
-  const initiateDeleteFriend = (f) => setFriendToDelete(f);
-  const confirmDeleteFriend = () => {
-    if (friendToDelete) {
-      setFriends((p) => p.filter((f) => f.id !== friendToDelete.id));
-      setFriendToDelete(null);
-    }
-  };
-  const openNoteModal = (f) => {
-    setCurrentNoteFriend(f);
-    setNoteInput(f.note || '');
-    setShowNoteModal(true);
-  };
-  const handleSaveNote = () => {
-    if (currentNoteFriend) setFriends((p) => p.map((f) => (f.id === currentNoteFriend.id ? { ...f, note: noteInput } : f)));
-    setShowNoteModal(false);
   };
 
   const getParticipantProfile = (participant) => friends.find((f) => f.id === participant.friendId);
