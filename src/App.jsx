@@ -30,6 +30,13 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { doc, getFirestore, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES } from './constants';
+import { NotificationOverlay } from './components/NotificationOverlay';
+import { Navigation } from './components/Navigation';
+import { StatusConfigModal } from './components/modals/StatusConfigModal';
+import { useFriends } from './hooks/useFriends';
+import { copyToClipboard } from './utils/clipboard';
+import { generateShortId } from './utils/id';
 
 const firebaseConfig = (() => {
   if (typeof __firebase_config !== 'undefined') return JSON.parse(__firebase_config);
@@ -50,80 +57,6 @@ if (firebaseConfig) {
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : import.meta.env.VITE_APP_ID || 'default-app-id';
 
-const RANDOM_NICKNAMES = ['干饭王', '碳水教父', '奶茶脑袋', '火锅战神', '减肥失败者', '随缘食客', '周五烧烤'];
-
-const INITIAL_OPEN_EVENTS = [
-  {
-    id: 'ab_confirmed_table',
-    title: '产品阿强 x Java老哥 的饭局',
-    description: 'A 主动邀了 B，B 偏好 2 人以上，饭局对好友开放拼桌',
-    sizePreference: '3-4人',
-    food: '日料 + 湘味混搭',
-    time: '12:10',
-    location: '公司楼下 · 二楼食堂',
-    participants: [
-      { friendId: 1, role: '发起人（用户A）' },
-      { friendId: 3, role: '确认嘉宾（用户B）' }
-    ],
-    joined: false
-  }
-];
-
-const INITIAL_FRIENDS = [
-  {
-    id: 1,
-    nickname: '产品阿强',
-    note: '张强-产品部',
-    avatarColor: 'bg-blue-500',
-    status: 'active',
-    wechatId: 'aqiang_pm',
-    lunchPlan: { food: '日料鳗鱼饭', size: '2人', time: '12:00', location: '公司楼下', hideFood: false, hideLocation: false }
-  },
-  {
-    id: 2,
-    nickname: '设计师小美',
-    note: '',
-    avatarColor: 'bg-pink-500',
-    status: 'active',
-    wechatId: 'design_beauty',
-    lunchPlan: { food: '轻食沙拉', size: '随意', time: '12:30', location: 'Wagas', hideFood: false, hideLocation: false }
-  },
-  {
-    id: 3,
-    nickname: 'Java老哥',
-    note: '李工',
-    avatarColor: 'bg-orange-500',
-    status: 'active',
-    wechatId: 'java_king',
-    lunchPlan: { food: '湘菜小炒', size: '3-4人', time: '11:50', location: '二楼食堂', hideFood: false, hideLocation: false }
-  },
-  {
-    id: 4,
-    nickname: '运营喵',
-    note: '',
-    avatarColor: 'bg-gray-400',
-    status: 'active',
-    wechatId: 'ops_cat',
-    lunchPlan: { food: '麦当劳', size: '1人', time: '12:15', location: '公司楼下', hideFood: true, hideLocation: true }
-  }
-];
-
-const copyToClipboard = (text) => {
-  const textarea = document.createElement('textarea');
-  textarea.value = text || '';
-  document.body.appendChild(textarea);
-  textarea.select();
-  try {
-    document.execCommand('copy');
-    alert('已复制 ID！');
-  } catch (err) {
-    console.error('Failed to copy:', err);
-  }
-  document.body.removeChild(textarea);
-};
-
-const generateShortId = () => Math.floor(100000 + Math.random() * 900000).toString();
-
 export default function LunchBuddyApp() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -133,8 +66,33 @@ export default function LunchBuddyApp() {
 
   const [activeTab, setActiveTab] = useState('home');
   const [myStatus, setMyStatus] = useState(null);
-  const [friends, setFriends] = useState(INITIAL_FRIENDS);
-  const [friendRequests, setFriendRequests] = useState([]);
+  const {
+    friends,
+    setFriends,
+    friendRequests,
+    setFriendRequests,
+    showAddFriendModal,
+    setShowAddFriendModal,
+    newFriendId,
+    setNewFriendId,
+    friendToDelete,
+    setFriendToDelete,
+    showNoteModal,
+    setShowNoteModal,
+    currentNoteFriend,
+    setCurrentNoteFriend,
+    noteInput,
+    setNoteInput,
+    showFriendRequestModal,
+    setShowFriendRequestModal,
+    simulateFriendRequest,
+    acceptFriendRequest,
+    handleAddFriend,
+    initiateDeleteFriend,
+    confirmDeleteFriend,
+    openNoteModal,
+    handleSaveNote
+  } = useFriends();
 
   const [confirmedDining, setConfirmedDining] = useState(null);
   const [friendToDate, setFriendToDate] = useState(null);
@@ -143,9 +101,6 @@ export default function LunchBuddyApp() {
   const [showCancelDiningModal, setShowCancelDiningModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [showStatusConfig, setShowStatusConfig] = useState(false);
-  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
-  const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
 
   const [lunchDetails, setLunchDetails] = useState({
     food: '',
@@ -155,10 +110,6 @@ export default function LunchBuddyApp() {
     hideFood: false,
     hideLocation: false
   });
-  const [newFriendId, setNewFriendId] = useState('');
-  const [friendToDelete, setFriendToDelete] = useState(null);
-  const [currentNoteFriend, setCurrentNoteFriend] = useState(null);
-  const [noteInput, setNoteInput] = useState('');
 
   const [diningViewMode, setDiningViewMode] = useState('me');
 
@@ -291,22 +242,13 @@ export default function LunchBuddyApp() {
     setIsEditingName(false);
   };
 
-  const simulateFriendRequest = () => {
-    const randomId = generateShortId();
-    const newRequest = { id: Date.now(), nickname: `新朋友_${randomId}`, shortId: randomId, avatarColor: 'bg-indigo-500' };
-    setFriendRequests((prev) => [...prev, newRequest]);
-    triggerNotification('新好友请求', `${newRequest.nickname} 请求添加你为好友`, 'friend_request');
-  };
-
-  const acceptFriendRequest = (request) => {
-    const newFriend = { ...request, status: 'active', lunchPlan: null };
-    setFriends([...friends, newFriend]);
-    setFriendRequests((prev) => prev.filter((r) => r.id !== request.id));
-    if (friendRequests.length <= 1) setShowFriendRequestModal(false);
-  };
-
   const simulateIncomingInvite = (friend) => {
     triggerNotification('收到约饭邀请', `${friend.nickname} 想要和你约饭`, 'incoming_invite', { friend });
+  };
+
+  const handleSimulateFriendRequest = () => {
+    const request = simulateFriendRequest();
+    triggerNotification('新好友请求', `${request.nickname} 请求添加你为好友`, 'friend_request');
   };
 
   const handleQuickStart = () => {
@@ -454,174 +396,6 @@ export default function LunchBuddyApp() {
         };
         return { ...event, joined: true, participants: [...event.participants, selfParticipant] };
       })
-    );
-  };
-
-  const NotificationOverlay = () => {
-    if (!notification) return null;
-    return (
-      <div
-        onClick={handleNotificationClick}
-        className="fixed top-4 left-4 right-4 z-50 bg-white/90 backdrop-blur-md border border-gray-200 shadow-2xl rounded-2xl p-4 animate-slide-down cursor-pointer active:scale-95 transition-transform"
-      >
-        <div className="flex items-start gap-3">
-          <div className="bg-orange-500 rounded-xl p-2 text-white">
-            {notification.type === 'friend_request' && <UserPlus size={20} />}
-            {notification.type === 'perfect_match' && <Sparkles size={20} />}
-            {notification.type === 'incoming_invite' && <BellRing size={20} />}
-          </div>
-          <div className="flex-1">
-            <h4 className="font-bold text-gray-800 text-sm">{notification.title}</h4>
-            <p className="text-xs text-gray-500 mt-0.5">{notification.body}</p>
-          </div>
-          <span className="text-[10px] text-gray-400">刚刚</span>
-        </div>
-      </div>
-    );
-  };
-
-  const Navigation = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 py-2 px-16 flex justify-between items-center z-10 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      <button
-        onClick={() => setActiveTab('home')}
-        className={`flex flex-col items-center space-y-1 p-2 w-16 transition-colors ${activeTab === 'home' ? 'text-orange-500' : 'text-gray-400'}`}
-      >
-        <Utensils size={24} />
-        <span className="text-xs font-medium">约饭</span>
-      </button>
-      <button
-        onClick={() => setActiveTab('friends')}
-        className={`flex flex-col items-center space-y-1 p-2 w-20 transition-colors ${activeTab === 'friends' ? 'text-orange-500' : 'text-gray-400'}`}
-      >
-        <div className="relative">
-          <Users size={24} />
-          {friendRequests.length > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>}
-        </div>
-        <span className="text-xs font-medium">我和朋友</span>
-      </button>
-    </div>
-  );
-
-  const StatusConfigModal = () => {
-    if (!showStatusConfig) return null;
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setShowStatusConfig(false)}></div>
-        <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden relative animate-bounce-in z-10 max-h-[90vh] flex flex-col">
-          <div className="bg-gradient-to-r from-orange-400 to-orange-500 p-6 pb-8 text-white shrink-0">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Target size={24} /> 精准组局
-            </h2>
-            <p className="text-orange-100 text-sm mt-1">有点想法？填个单子告诉大家</p>
-            <button
-              onClick={() => setShowStatusConfig(false)}
-              className="absolute top-4 right-4 text-white/80 hover:text-white"
-            >
-              <X size={24} />
-            </button>
-          </div>
-          <div className="p-6 -mt-4 bg-white rounded-t-3xl space-y-5 flex-1 overflow-y-auto">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Utensils size={16} className="text-orange-500" /> 想吃什么
-                </div>
-                <button
-                  onClick={() => togglePrivacy('hideFood')}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-colors ${
-                    lunchDetails.hideFood ? 'bg-orange-100 text-orange-600' : 'text-gray-400 hover:bg-gray-100'
-                  }`}
-                >
-                  {lunchDetails.hideFood ? <EyeOff size={12} /> : <Eye size={12} />}
-                  {lunchDetails.hideFood ? '隐藏' : '公开'}
-                </button>
-              </label>
-              <input
-                type="text"
-                value={lunchDetails.food}
-                onChange={(e) => setLunchDetails({ ...lunchDetails, food: e.target.value })}
-                placeholder="例如：日料 (默认: 随便)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
-              />
-              <div className="flex gap-2 flex-wrap">
-                {['随便', '火锅', '轻食', '烧烤'].map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setLunchDetails({ ...lunchDetails, food: tag })}
-                    className={`text-xs px-2 py-1 rounded-full border ${
-                      lunchDetails.food === tag ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-white text-gray-500 border-gray-200'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <Users size={16} className="text-blue-500" /> 几人局
-                </label>
-                <select
-                  value={lunchDetails.size}
-                  onChange={(e) => setLunchDetails({ ...lunchDetails, size: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none"
-                >
-                  <option value="随意">随意 (默认)</option>
-                  <option value="2人">2人</option>
-                  <option value="3-4人">3-4人</option>
-                  <option value="多人聚餐">多人聚餐</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                  <Clock size={16} className="text-green-500" /> 时间
-                </label>
-                <select
-                  value={lunchDetails.time}
-                  onChange={(e) => setLunchDetails({ ...lunchDetails, time: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-200 appearance-none"
-                >
-                  <option value="随意">随意 (默认)</option>
-                  <option value="11:30">11:30</option>
-                  <option value="12:00">12:00</option>
-                  <option value="12:30">12:30</option>
-                  <option value="13:00">13:00</option>
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-purple-500" /> 目标地点
-                </div>
-                <button
-                  onClick={() => togglePrivacy('hideLocation')}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-colors ${
-                    lunchDetails.hideLocation ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:bg-gray-100'
-                  }`}
-                >
-                  {lunchDetails.hideLocation ? <EyeOff size={12} /> : <Eye size={12} />}
-                  {lunchDetails.hideLocation ? '隐藏' : '公开'}
-                </button>
-              </label>
-              <input
-                type="text"
-                value={lunchDetails.location}
-                onChange={(e) => setLunchDetails({ ...lunchDetails, location: e.target.value })}
-                placeholder="例如：公司楼下"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-              />
-            </div>
-            <button
-              onClick={confirmPublishStatus}
-              className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 mt-4"
-            >
-              <Target size={20} className="text-yellow-400" fill="currentColor" /> 发布组局
-            </button>
-          </div>
-        </div>
-      </div>
     );
   };
 
@@ -1074,7 +848,7 @@ export default function LunchBuddyApp() {
 
         <div className="flex gap-2 px-6 py-2 overflow-x-auto">
           <button
-            onClick={simulateFriendRequest}
+            onClick={handleSimulateFriendRequest}
             className="text-xs border border-gray-300 px-2 py-1 rounded bg-gray-50 whitespace-nowrap hover:bg-gray-100"
           >
             ⚡️模拟好友请求
@@ -1308,9 +1082,16 @@ export default function LunchBuddyApp() {
           {activeTab === 'home' && <HomeView />}
           {activeTab === 'friends' && <FriendsView />}
         </div>
-        <Navigation />
-        <StatusConfigModal />
-        <NotificationOverlay />
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
+        <StatusConfigModal
+          isOpen={showStatusConfig}
+          lunchDetails={lunchDetails}
+          onClose={() => setShowStatusConfig(false)}
+          onConfirm={confirmPublishStatus}
+          onUpdate={setLunchDetails}
+          onTogglePrivacy={togglePrivacy}
+        />
+        <NotificationOverlay notification={notification} onClick={handleNotificationClick} />
 
         {friendToDate && !['partner', 'received_invite'].includes(datingStep) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
