@@ -25,6 +25,7 @@ import {
   Edit2,
   Save,
   Edit,
+  Download,
   UserPlus,
   LogIn
 } from 'lucide-react';
@@ -121,6 +122,47 @@ export default function LunchBuddyApp() {
   const [notification, setNotification] = useState(null);
 
   const [openDiningEvents, setOpenDiningEvents] = useState(INITIAL_OPEN_EVENTS);
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  const installPromptDismissedKey = `lunchbuddy_install_prompt_dismissed_${appId}`;
+
+  const hasDismissedInstallPrompt = () =>
+    typeof window !== 'undefined' && localStorage.getItem(installPromptDismissedKey) === '1';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const updateDisplayMode = () => setIsStandalone(mediaQuery.matches || window.navigator.standalone);
+    updateDisplayMode();
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      if (hasDismissedInstallPrompt() || mediaQuery.matches || window.navigator.standalone) return;
+      setInstallPromptEvent(event);
+      setShowInstallPrompt(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setShowInstallPrompt(false);
+      setInstallPromptEvent(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    if (mediaQuery.addEventListener) mediaQuery.addEventListener('change', updateDisplayMode);
+    else mediaQuery.addListener(updateDisplayMode);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      if (mediaQuery.removeEventListener) mediaQuery.removeEventListener('change', updateDisplayMode);
+      else mediaQuery.removeListener(updateDisplayMode);
+    };
+  }, []);
 
   useEffect(() => {
     if (!auth || !db) {
@@ -315,6 +357,29 @@ export default function LunchBuddyApp() {
   const initiateDateFriend = (f) => {
     setFriendToDate(f);
     setDatingStep('confirm');
+  };
+
+  const handleInstallApp = async () => {
+    if (!installPromptEvent) {
+      setShowInstallPrompt(false);
+      return;
+    }
+    installPromptEvent.prompt();
+    const choice = await installPromptEvent.userChoice;
+    if (choice.outcome === 'accepted') {
+      setShowInstallPrompt(false);
+      setInstallPromptEvent(null);
+    } else if (typeof window !== 'undefined') {
+      localStorage.setItem(installPromptDismissedKey, '1');
+      setShowInstallPrompt(false);
+    }
+  };
+
+  const handleDismissInstallPrompt = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(installPromptDismissedKey, '1');
+    }
+    setShowInstallPrompt(false);
   };
   const handleSendInvite = () => setDatingStep('partner');
   const handlePartnerDecline = () => {
@@ -1169,6 +1234,35 @@ export default function LunchBuddyApp() {
           {activeTab === 'friends' && <FriendsView />}
         </div>
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
+        {showInstallPrompt && !isStandalone && (
+          <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
+            <div className="bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-orange-100 text-orange-600">
+                <Download size={18} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-gray-800">添加到主屏幕</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={handleInstallApp}
+                    className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform"
+                  >
+                    立即添加
+                  </button>
+                  <button
+                    onClick={handleDismissInstallPrompt}
+                    className="px-3 py-2 text-xs text-gray-500 bg-gray-100 rounded-xl font-medium hover:bg-gray-200"
+                  >
+                    稍后再说
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <StatusConfigModal
           isOpen={showStatusConfig}
           lunchDetails={lunchDetails}
