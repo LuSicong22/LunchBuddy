@@ -651,7 +651,15 @@ export default function LunchBuddyApp() {
           <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-800">当前{confirmedDining.isGroup ? '饭群' : '饭局'}</h1>
             {confirmedDining.isGroup ? (
-              <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">多人饭群</div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">多人饭群</div>
+                <button
+                  onClick={handleInitiateCancel}
+                  className="text-xs bg-white px-2 py-1 rounded-full text-red-400 hover:text-red-500 border border-red-100 transition-colors"
+                >
+                  取消/结束饭群
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setDiningViewMode(diningViewMode === 'me' ? 'partner' : 'me')}
