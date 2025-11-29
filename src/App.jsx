@@ -57,6 +57,7 @@ if (firebaseConfig) {
 }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : import.meta.env.VITE_APP_ID || 'default-app-id';
+const localProfileKey = `lunchbuddy_profile_${appId}`;
 
 export default function LunchBuddyApp() {
   const [user, setUser] = useState(null);
@@ -123,14 +124,20 @@ export default function LunchBuddyApp() {
 
   useEffect(() => {
     if (!auth || !db) {
-      const fallbackProfile = {
-        nickname: '离线食客',
-        avatarColor: 'bg-orange-500',
-        shortId: generateShortId()
-      };
+      const cachedProfile = (() => {
+        const stored = localStorage.getItem(localProfileKey);
+        return stored ? JSON.parse(stored) : null;
+      })();
+
       setUser({ uid: 'local-user' });
-      setUserProfile(fallbackProfile);
-      setEditedName(fallbackProfile.nickname);
+
+      if (cachedProfile) {
+        setUserProfile(cachedProfile);
+        setEditedName(cachedProfile.nickname);
+      } else {
+        setUserProfile(null);
+      }
+
       setAuthLoading(false);
       return;
     }
@@ -210,6 +217,7 @@ export default function LunchBuddyApp() {
         avatarColor: 'bg-orange-500',
         shortId: generateShortId()
       };
+      localStorage.setItem(localProfileKey, JSON.stringify(localProfile));
       setUserProfile(localProfile);
       setEditedName(localProfile.nickname);
       setIsRegistering(false);
@@ -234,7 +242,11 @@ export default function LunchBuddyApp() {
   const handleUpdateNickname = async () => {
     if (!editedName.trim() || !user) return;
     if (!db || !auth) {
-      setUserProfile((p) => ({ ...p, nickname: editedName }));
+      setUserProfile((p) => {
+        const updated = { ...p, nickname: editedName };
+        localStorage.setItem(localProfileKey, JSON.stringify(updated));
+        return updated;
+      });
       setIsEditingName(false);
       return;
     }
@@ -724,7 +736,8 @@ export default function LunchBuddyApp() {
     return (
       <div className="flex flex-col h-full bg-gray-50">
         <div className="bg-white px-6 pt-10 pb-6 rounded-b-3xl shadow-sm z-10 transition-all duration-300">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">中午好，<br />今天想和朋友吃饭吗？</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-1">中午好，{userProfile?.nickname || '朋友'}</h1>
+          <p className="text-sm text-gray-500 mb-4">今天想和朋友吃饭吗？</p>
           {myStatus === 'active' ? (
             <div className="relative overflow-hidden rounded-2xl transition-all duration-300 border-2 bg-orange-50 border-orange-200 shadow-orange-100 shadow-lg p-4 animate-pulse-slow">
               <div className="flex items-center justify-between relative z-10">
