@@ -1266,65 +1266,81 @@ export default function LunchBuddyApp() {
     );
   }
 
-    return (
-      <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
-        <div className="w-full max-w-md bg-white min-h-[100dvh] relative shadow-2xl flex flex-col">
-          <div className="flex-1 overflow-hidden relative pb-24">
-            {activeTab === 'home' && <HomeView />}
-            {activeTab === 'friends' && <FriendsView />}
-          </div>
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
-        {showInstallPrompt && !isStandalone && (
-          <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
-            <div className="bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-start gap-3">
-              <div className="p-2.5 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900">
-                <SquarePlus size={18} strokeWidth={2.5} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-gray-800">添加到主屏幕</p>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  {installPromptEvent
-                    ? '安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。'
-                    : isIos
-                      ? '在浏览器底部的分享菜单中选择 “添加到主屏幕”，即可快速打开 LunchBuddy。'
-                      : '在浏览器菜单中选择 “添加到主屏幕/安装应用”，即可更方便地启动 LunchBuddy。'}
-                </p>
-                {showInstallGuide && !installPromptEvent && (
-                  <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600 leading-relaxed">
-                    <p className="font-semibold text-gray-800 mb-1">添加步骤：</p>
-                    {isIos ? (
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>点击浏览器底部的分享图标</li>
-                        <li>选择 “添加到主屏幕”</li>
-                        <li>点击右上角 “添加” 完成安装</li>
-                      </ol>
-                    ) : (
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>打开浏览器菜单（⋮/…）</li>
-                        <li>找到 “添加到主屏幕” 或 “安装应用”</li>
-                        <li>确认添加后即可从桌面打开 LunchBuddy</li>
-                      </ol>
-                    )}
+  const shouldShowInstallPrompt = showInstallPrompt && !isStandalone;
+
+  return (
+    <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
+      <div className="w-full max-w-md bg-white min-h-[100dvh] relative shadow-2xl flex flex-col">
+        <div
+          className={`flex-1 overflow-hidden relative pb-24 transition-[padding-top] duration-300 ${shouldShowInstallPrompt ? 'pt-28' : 'pt-0'}`}
+        >
+          {shouldShowInstallPrompt && (
+            <div className="absolute top-4 left-4 right-4 z-40 animate-slide-down">
+              <div className="relative rounded-2xl bg-white text-gray-900 shadow-2xl border border-gray-200">
+                <div className="p-4 pb-3">
+                  <div className="flex gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm">
+                      <SquarePlus size={24} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">添加到主屏幕</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 text-[10px] font-semibold">饭局推送</span>
+                            <p className="text-xs text-gray-500 leading-relaxed">添加后即可直接打开并接收提醒。</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleDismissInstallPrompt}
+                          aria-label="关闭安装提示"
+                          className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:text-gray-700 hover:bg-gray-200 active:scale-95 transition"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={handleInstallApp}
-                    className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform"
-                  >
-                    {installPromptEvent ? '立即添加' : showInstallGuide ? '收起指引' : '查看指引'}
-                  </button>
-                  <button
-                    onClick={handleDismissInstallPrompt}
-                    className="px-3 py-2 text-xs text-gray-500 bg-gray-100 rounded-xl font-medium hover:bg-gray-200"
-                  >
-                    稍后再说
-                  </button>
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <button
+                      onClick={handleDismissInstallPrompt}
+                      className="px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-95 transition"
+                    >
+                      稍后
+                    </button>
+                    <button
+                      onClick={handleInstallApp}
+                      className="px-4 py-2 text-xs font-semibold bg-gray-900 text-white rounded-xl shadow-md active:scale-95 transition"
+                    >
+                      {installPromptEvent ? '立即添加' : showInstallGuide ? '收起指引' : '查看指引'}
+                    </button>
+                  </div>
+                  {showInstallGuide && !installPromptEvent && (
+                    <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 leading-relaxed">
+                      <p className="font-semibold text-gray-900 mb-1">添加步骤：</p>
+                      {isIos ? (
+                        <ol className="list-decimal list-inside space-y-1">
+                          <li>点击浏览器底部的分享图标</li>
+                          <li>选择 “添加到主屏幕”</li>
+                          <li>点击右上角 “添加” 完成安装</li>
+                        </ol>
+                      ) : (
+                        <ol className="list-decimal list-inside space-y-1">
+                          <li>打开浏览器菜单（⋮/…）</li>
+                          <li>找到 “添加到主屏幕” 或 “安装应用”</li>
+                          <li>确认添加后即可从桌面打开 LunchBuddy</li>
+                        </ol>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+          {activeTab === 'home' && <HomeView />}
+          {activeTab === 'friends' && <FriendsView />}
+        </div>
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
         <StatusConfigModal
           isOpen={showStatusConfig}
           lunchDetails={lunchDetails}
