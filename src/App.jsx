@@ -25,7 +25,7 @@ import {
   Edit2,
   Save,
   Edit,
-  Download,
+  SquarePlus,
   UserPlus,
   LogIn
 } from 'lucide-react';
@@ -1278,8 +1278,8 @@ export default function LunchBuddyApp() {
         {showInstallPrompt && !isStandalone && (
           <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
             <div className="bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-orange-100 text-orange-600">
-                <Download size={18} />
+              <div className="p-2.5 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900">
+                <SquarePlus size={18} strokeWidth={2.5} />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold text-gray-800">添加到主屏幕</p>
