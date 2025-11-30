@@ -660,7 +660,11 @@ export default function LunchBuddyApp() {
           <div className="flex-1 p-5 pt-3 pb-24 flex flex-col items-center overflow-y-auto">
             <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative">
               <div className="bg-gradient-to-r from-orange-400 to-red-500 h-20 relative flex items-center justify-center">
-                <h2 className="text-white font-bold text-2xl drop-shadow-md">{confirmedDining.isGroup ? '多人饭局已确认 🎉' : diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
+                {!confirmedDining.isGroup && (
+                  <h2 className="text-white font-bold text-2xl drop-shadow-md">
+                    {diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}
+                  </h2>
+                )}
                 <div className="absolute -bottom-10 flex gap-3 justify-center w-full px-4">
                   {confirmedDining.isGroup ? (
                     <div className="flex -space-x-3 bg-white/20 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm">
