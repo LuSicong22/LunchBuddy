@@ -440,9 +440,21 @@ export default function LunchBuddyApp() {
     setCancelReason('');
     setShowCancelDiningModal(true);
   };
+  const resetOpenDiningEvent = (eventId) => {
+    if (!eventId) return;
+    setOpenDiningEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== eventId) return event;
+        const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
+        return { ...event, joined: false, participants: filteredParticipants };
+      })
+    );
+  };
+
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) return;
     if (confirmedDining?.partner) setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
+    if (confirmedDining?.id) resetOpenDiningEvent(confirmedDining.id);
     setConfirmedDining(null);
     setShowCancelDiningModal(false);
     setCancelReason('');
@@ -457,15 +469,7 @@ export default function LunchBuddyApp() {
       setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
     }
 
-    if (isFromOpenEvent) {
-      setOpenDiningEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== confirmedId) return event;
-          const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
-          return { ...event, joined: false, participants: filteredParticipants };
-        })
-      );
-    }
+    if (isFromOpenEvent) resetOpenDiningEvent(confirmedId);
 
     setConfirmedDining(null);
     setDiningViewMode('me');
