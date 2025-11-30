@@ -14,7 +14,6 @@ import {
   Trash2,
   CheckCircle2,
   X,
-  CalendarCheck,
   HandPlatter,
   MessageSquare,
   BellRing,
@@ -668,8 +667,14 @@ export default function LunchBuddyApp() {
 
   const HomeView = () => {
     const visibleOpenEvents = openDiningEvents.filter((event) => eventHasFriend(event));
-    const hasGroupEvents = visibleOpenEvents.some((event) => isGroupDining(event));
-    const openDiningTitle = hasGroupEvents ? '好友在场的开放饭局（含多人局）' : '好友在场的开放饭局';
+    const activeFriends = friends.filter((f) => f.status === 'active');
+    const activeItems = [
+      ...visibleOpenEvents.map((event) => ({ type: 'event', id: event.id, data: event })),
+      ...activeFriends.map((friend) => ({ type: 'friend', id: friend.id, data: friend }))
+    ];
+
+    const renderActiveItem = (item) =>
+      item.type === 'event' ? <OpenDiningCard key={item.id} event={item.data} /> : <FriendCard key={item.id} friend={item.data} />;
     if (confirmedDining) {
       return (
         <div className="flex flex-col h-full bg-orange-50">
@@ -830,15 +835,22 @@ export default function LunchBuddyApp() {
       );
     }
 
-    const activeFriends = friends.filter((f) => f.status === 'active');
-    let matchedFriends = [];
-    let otherFriends = [];
+    let matchedItems = [];
+    let otherItems = [];
 
     if (myStatus === 'active') {
-      activeFriends.forEach((friend) => {
-        const isPlanMatch = checkIsMatch(lunchDetails, friend.lunchPlan);
-        if (isPlanMatch) matchedFriends.push(friend);
-        else otherFriends.push(friend);
+      activeItems.forEach((item) => {
+        if (item.type === 'event') {
+          const { food, time, location } = item.data;
+          const isPlanMatch = checkIsMatch(lunchDetails, { food, time, location });
+          if (isPlanMatch) matchedItems.push(item);
+          else otherItems.push(item);
+          return;
+        }
+
+        const isPlanMatch = checkIsMatch(lunchDetails, item.data.lunchPlan);
+        if (isPlanMatch) matchedItems.push(item);
+        else otherItems.push(item);
       });
     }
 
@@ -917,30 +929,16 @@ export default function LunchBuddyApp() {
           )}
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-6 pb-24">
-          {visibleOpenEvents.length > 0 && (
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-2 px-1">
-                <CalendarCheck className="text-orange-500" size={18} />
-                <h2 className="font-bold text-gray-800">{openDiningTitle}</h2>
-                <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">{visibleOpenEvents.length}</span>
-              </div>
-              <div className="space-y-3">
-                {visibleOpenEvents.map((event) => (
-                  <OpenDiningCard key={event.id} event={event} />
-                ))}
-              </div>
-            </div>
-          )}
           {myStatus === 'active' ? (
             <div className="space-y-8">
               <div>
                 <div className="flex items-center gap-2 mb-3 px-2">
                   <Sparkles className="text-yellow-500" size={18} fill="currentColor" />
                   <h2 className="font-bold text-gray-800">完美匹配</h2>
-                  <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{matchedFriends.length}</span>
+                  <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{matchedItems.length}</span>
                 </div>
-                {matchedFriends.length > 0 ? (
-                  <div className="space-y-4">{matchedFriends.map((friend) => <FriendCard key={friend.id} friend={friend} />)}</div>
+                {matchedItems.length > 0 ? (
+                  <div className="space-y-4">{matchedItems.map((item) => renderActiveItem(item))}</div>
                 ) : (
                   <div className="bg-white/50 border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center text-gray-400 gap-2">
                     <Sparkles size={24} className="opacity-20" />
@@ -952,10 +950,10 @@ export default function LunchBuddyApp() {
                 <div className="flex items-center gap-2 mb-3 px-2">
                   <Users className="text-gray-400" size={18} />
                   <h2 className="font-bold text-gray-500">其他活跃饭友</h2>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{otherFriends.length}</span>
+                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{otherItems.length}</span>
                 </div>
-                {otherFriends.length > 0 ? (
-                  <div className="space-y-4">{otherFriends.map((friend) => <FriendCard key={friend.id} friend={friend} />)}</div>
+                {otherItems.length > 0 ? (
+                  <div className="space-y-4">{otherItems.map((item) => renderActiveItem(item))}</div>
                 ) : (
                   <div className="bg-white/50 border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center text-gray-400 gap-2">
                     <Users size={24} className="opacity-20" />
@@ -967,14 +965,12 @@ export default function LunchBuddyApp() {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4 px-2">
-                <h2 className="font-bold text-gray-700">正在觅食的朋友 ({activeFriends.length})</h2>
+                <h2 className="font-bold text-gray-700">正在觅食的朋友 ({activeItems.length})</h2>
                 <span className="text-xs text-orange-500 bg-orange-100 px-2 py-1 rounded-full">实时更新</span>
               </div>
               <div className="space-y-4">
-                {activeFriends.map((friend) => (
-                  <FriendCard key={friend.id} friend={friend} />
-                ))}
-                {activeFriends.length === 0 && (
+                {activeItems.map((item) => renderActiveItem(item))}
+                {activeItems.length === 0 && (
                   <div className="text-center py-10 text-gray-400 text-sm">
                     哎呀，现在好像没有朋友在找吃的。<br />要不你主动吼一声？
                   </div>
