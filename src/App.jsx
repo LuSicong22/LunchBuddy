@@ -448,31 +448,6 @@ export default function LunchBuddyApp() {
     setCancelReason('');
   };
 
-  const handleExitDining = () => {
-    const confirmedId = confirmedDining?.id;
-    const isFromOpenEvent = Boolean(confirmedId);
-    if (!window.confirm('确定要退出当前饭局吗？')) return;
-
-    if (confirmedDining?.partner) {
-      setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
-    }
-
-    if (isFromOpenEvent) {
-      setOpenDiningEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== confirmedId) return event;
-          const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
-          return { ...event, joined: false, participants: filteredParticipants };
-        })
-      );
-    }
-
-    setConfirmedDining(null);
-    setDiningViewMode('me');
-    setShowCancelDiningModal(false);
-    setCancelReason('');
-  };
-
   const checkIsMatch = (my, fr) => {
     if (!fr) return false;
     const chk = (a, b) => (!a || !b || a === '随意' || b === '随意' || a === '') ? true : a.includes(b) || b.includes(a);
@@ -717,8 +692,6 @@ export default function LunchBuddyApp() {
               <div className="pt-12 pb-6 px-6 text-center space-y-5">
                 {confirmedDining.isGroup ? (
                   <div className="space-y-3">
-                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">多人饭局</p>
-                    <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭局'}</p>
                     <p className="text-gray-700 font-medium leading-tight px-4">
                       {(confirmedDining.participants || []).map((p) => p.nickname).join('、')}
                     </p>
@@ -779,11 +752,8 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                      <div className="flex items-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
@@ -791,11 +761,8 @@ export default function LunchBuddyApp() {
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                      <div className="flex items-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
