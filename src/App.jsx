@@ -615,38 +615,22 @@ export default function LunchBuddyApp() {
             </div>
             {friend.lunchPlan ? (
               <div className="flex flex-wrap gap-1.5">
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-md flex items-center gap-0.5 whitespace-nowrap font-medium ${
-                    friend.lunchPlan.hideFood ? 'bg-gray-100 text-gray-400' : 'bg-orange-100 text-orange-600'
-                  }`}
-                >
-                  {friend.lunchPlan.hideFood ? (
-                    <>
-                      <EyeOff size={10} /> 秘密
-                    </>
-                  ) : (
-                    friend.lunchPlan.food
-                  )}
-                </span>
+                {!friend.lunchPlan.hideFood && (
+                  <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap font-medium">
+                    {friend.lunchPlan.food}
+                  </span>
+                )}
                 <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-0.5 rounded-md flex items-center gap-0.5 whitespace-nowrap font-medium">
                   {friend.lunchPlan.size}
                 </span>
                 <span className="bg-green-100 text-green-600 text-[10px] px-2 py-0.5 rounded-md flex items-center gap-0.5 whitespace-nowrap font-medium">
                   {friend.lunchPlan.time}
                 </span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-md flex items-center gap-0.5 whitespace-nowrap font-medium ${
-                    friend.lunchPlan.hideLocation ? 'bg-gray-100 text-gray-400' : 'bg-purple-100 text-purple-600'
-                  }`}
-                >
-                  {friend.lunchPlan.hideLocation ? (
-                    <>
-                      <EyeOff size={10} /> 秘密
-                    </>
-                  ) : (
-                    friend.lunchPlan.location
-                  )}
-                </span>
+                {!friend.lunchPlan.hideLocation && (
+                  <span className="bg-purple-100 text-purple-600 text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap font-medium">
+                    {friend.lunchPlan.location}
+                  </span>
+                )}
               </div>
             ) : (
               <span className="text-xs text-gray-300">暂无计划</span>
