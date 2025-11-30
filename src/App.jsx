@@ -448,30 +448,6 @@ export default function LunchBuddyApp() {
     setCancelReason('');
   };
 
-  const handleExitDining = () => {
-    const confirmedId = confirmedDining?.id;
-    const isFromOpenEvent = Boolean(confirmedId);
-    if (!window.confirm('确定要退出当前饭局吗？')) return;
-
-    if (confirmedDining?.partner) {
-      setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
-    }
-
-    if (isFromOpenEvent) {
-      setOpenDiningEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== confirmedId) return event;
-          const filteredParticipants = (event.participants || []).filter((p) => !p.isSelf);
-          return { ...event, joined: false, participants: filteredParticipants };
-        })
-      );
-    }
-
-    setConfirmedDining(null);
-    setDiningViewMode('me');
-    setShowCancelDiningModal(false);
-    setCancelReason('');
-  };
   const checkIsMatch = (my, fr) => {
     if (!fr) return false;
     const chk = (a, b) => (!a || !b || a === '随意' || b === '随意' || a === '') ? true : a.includes(b) || b.includes(a);
@@ -788,22 +764,26 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                      <div className="flex items-center justify-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
                       </div>
-                      <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
-                        取消/结束饭局
+                      <button
+                        onClick={handleInitiateCancel}
+                        className="w-full py-3 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 hover:bg-red-100 transition-colors"
+                      >
+                        退出饭局
                       </button>
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                      <div className="flex items-center justify-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
                       </div>
-                      <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
-                        取消/结束饭局
+                      <button
+                        onClick={handleInitiateCancel}
+                        className="w-full py-3 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 hover:bg-red-100 transition-colors"
+                      >
+                        退出饭局
                       </button>
                     </>
                   ) : (
@@ -1267,13 +1247,13 @@ export default function LunchBuddyApp() {
     );
   }
 
-  return (
-    <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
-      <div className="w-full max-w-md bg-white h-[100dvh] overflow-hidden relative shadow-2xl flex flex-col">
-        <div className="flex-1 overflow-hidden relative">
-          {activeTab === 'home' && <HomeView />}
-          {activeTab === 'friends' && <FriendsView />}
-        </div>
+    return (
+      <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
+        <div className="w-full max-w-md bg-white min-h-[100dvh] relative shadow-2xl flex flex-col">
+          <div className="flex-1 overflow-hidden relative pb-24">
+            {activeTab === 'home' && <HomeView />}
+            {activeTab === 'friends' && <FriendsView />}
+          </div>
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
         {showInstallPrompt && !isStandalone && (
           <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
