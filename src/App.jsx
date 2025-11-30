@@ -472,6 +472,7 @@ export default function LunchBuddyApp() {
     setShowCancelDiningModal(false);
     setCancelReason('');
   };
+
   const checkIsMatch = (my, fr) => {
     if (!fr) return false;
     const chk = (a, b) => (!a || !b || a === '随意' || b === '随意' || a === '') ? true : a.includes(b) || b.includes(a);
@@ -681,8 +682,8 @@ export default function LunchBuddyApp() {
               </button>
             )}
           </div>
-          <div className="flex-1 p-5 pt-3 flex flex-col items-center overflow-y-auto">
-            <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative max-h-[calc(100vh-190px)]">
+          <div className="flex-1 p-5 pt-3 pb-24 flex flex-col items-center overflow-y-auto">
+            <div className="bg-white w-full rounded-3xl shadow-xl overflow-hidden animate-slide-up relative">
               <div className="bg-gradient-to-r from-orange-400 to-red-500 h-20 relative flex items-center justify-center">
                 <h2 className="text-white font-bold text-2xl drop-shadow-md">{confirmedDining.isGroup ? '多人饭局已确认 🎉' : diningViewMode === 'me' ? '饭局已确认 🎉' : '收到饭局邀请 🎉'}</h2>
                 <div className="absolute -bottom-10 flex gap-3 justify-center w-full px-4">
@@ -705,15 +706,10 @@ export default function LunchBuddyApp() {
                       )}
                     </div>
                   ) : (
-                    <div className="flex gap-4">
-                      <div className="w-20 h-20 rounded-full bg-gray-200 border-4 border-white shadow-md overflow-hidden">
-                        <div className="w-full h-full bg-gray-800 flex items-center justify-center text-white font-bold text-2xl">我</div>
-                      </div>
-                      <div
-                        className={`w-20 h-20 rounded-full ${confirmedDining.partner.avatarColor} border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-2xl`}
-                      >
-                        {diningViewMode === 'me' ? confirmedDining.partner.nickname[0] : '我'}
-                      </div>
+                    <div
+                      className={`w-20 h-20 rounded-full ${confirmedDining.partner.avatarColor} border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-2xl`}
+                    >
+                      {confirmedDining.partner.nickname[0]}
                     </div>
                   )}
                 </div>
@@ -723,21 +719,16 @@ export default function LunchBuddyApp() {
                   <div className="space-y-3">
                     <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">多人饭局</p>
                     <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭局'}</p>
-                    <div className="flex flex-wrap justify-center gap-2 max-h-24 overflow-y-auto px-2">
-                      {confirmedDining.participants?.map((p) => (
-                        <span key={p.id} className="inline-flex items-center gap-1 bg-gray-50 text-gray-700 px-2 py-1 rounded-full text-xs">
-                          <span className={`w-6 h-6 rounded-full ${p.avatarColor} text-white flex items-center justify-center text-[10px] font-bold`}>
-                            {p.nickname[0]}
-                          </span>
-                          <span className="font-medium">{p.nickname}</span>
-                        </span>
-                      ))}
-                    </div>
+                    <p className="text-gray-700 font-medium leading-tight px-4">
+                      {(confirmedDining.participants || []).map((p) => p.nickname).join('、')}
+                    </p>
                   </div>
                 ) : (
                   <div>
                     <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">PARTNER</p>
-                    <p className="text-gray-800 font-bold text-lg">{diningViewMode === 'me' ? confirmedDining.partner.nickname : '我'}</p>
+                    <p className="text-gray-800 font-bold text-lg">
+                      {(userProfile?.nickname || '我') + ' & ' + confirmedDining.partner.nickname}
+                    </p>
                     <div className="mt-2">
                       {confirmedDining.isAcknowledged ? (
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
@@ -788,9 +779,11 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
+                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
+                          退出饭局
+                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
@@ -798,9 +791,11 @@ export default function LunchBuddyApp() {
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">退出饭局</button>
+                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
+                          退出饭局
+                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
@@ -1267,13 +1262,13 @@ export default function LunchBuddyApp() {
     );
   }
 
-  return (
-    <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
-      <div className="w-full max-w-md bg-white h-[100dvh] overflow-hidden relative shadow-2xl flex flex-col">
-        <div className="flex-1 overflow-hidden relative">
-          {activeTab === 'home' && <HomeView />}
-          {activeTab === 'friends' && <FriendsView />}
-        </div>
+    return (
+      <div className="bg-gray-100 min-h-screen flex justify-center font-sans antialiased text-gray-900 selection:bg-orange-100">
+        <div className="w-full max-w-md bg-white min-h-[100dvh] relative shadow-2xl flex flex-col">
+          <div className="flex-1 overflow-hidden relative pb-24">
+            {activeTab === 'home' && <HomeView />}
+            {activeTab === 'friends' && <FriendsView />}
+          </div>
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} friendRequestCount={friendRequests.length} />
         {showInstallPrompt && !isStandalone && (
           <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
