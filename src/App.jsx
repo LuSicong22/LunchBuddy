@@ -720,9 +720,7 @@ export default function LunchBuddyApp() {
               </div>
               <div className="pt-12 pb-6 px-6 text-center space-y-5">
                 {confirmedDining.isGroup ? (
-                  <div className="space-y-3">
-                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">多人饭局</p>
-                    <p className="text-gray-800 font-bold text-lg truncate">{confirmedDining.title || '好友饭局'}</p>
+                  <div className="space-y-1">
                     <p className="text-gray-700 font-medium leading-tight px-4">
                       {(confirmedDining.participants || []).map((p) => p.nickname).join('、')}
                     </p>
@@ -783,11 +781,8 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                      <div className="flex items-center justify-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
@@ -795,11 +790,8 @@ export default function LunchBuddyApp() {
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                      <div className="flex items-center justify-center text-xs text-gray-400 mb-3">
                         <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
                       </div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
