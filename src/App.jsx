@@ -87,7 +87,6 @@ const VAPID_PUBLIC_KEY =
   (typeof __vapid_public_key !== "undefined" && __vapid_public_key) ||
   import.meta.env.VITE_VAPID_PUBLIC_KEY ||
   "";
-const notificationPromptDismissedKey = `lunchbuddy_notification_prompt_dismissed_${appId}`;
 
 const MealIcon = ({ className = "" }) => (
   <svg
@@ -207,6 +206,7 @@ export default function LunchBuddyApp() {
   const [editedName, setEditedName] = useState("");
   const friendRequestPrevCountRef = useRef(0);
   const invitePrevCountRef = useRef(0);
+  const inviteVersionRef = useRef({});
   const [, setIncomingInvites] = useState([]);
   const [notificationPermission, setNotificationPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "default"
@@ -492,22 +492,55 @@ export default function LunchBuddyApp() {
             lunchPlan,
           };
         });
+
+        let latestInvite = null;
+        snapshot.docChanges().forEach((change) => {
+          const docData = change.doc.data() || {};
+          const version =
+            docData.updatedAt || docData.createdAt || change.doc.updateTime?.toMillis();
+          const prevVersion = inviteVersionRef.current[change.doc.id];
+          if (change.type === "added" || version !== prevVersion) {
+            inviteVersionRef.current[change.doc.id] = version;
+            const lunchPlan =
+              docData.lunchPlan ||
+              docData.plan ||
+              (docData.food || docData.time || docData.location || docData.size
+                ? {
+                    food: docData.food,
+                    time: docData.time,
+                    location: docData.location,
+                    size: docData.size,
+                  }
+                : null);
+            latestInvite = {
+              id: change.doc.id,
+              ...docData,
+              fromUid: docData.fromUid || docData.uid || change.doc.id,
+              fromNickname: docData.fromNickname || docData.nickname || "好友",
+              fromAvatarColor: docData.fromAvatarColor || docData.avatarColor || "bg-orange-500",
+              lunchPlan,
+            };
+          }
+        });
+
         setIncomingInvites(invites);
-        if (invites.length > invitePrevCountRef.current) {
-          const latest = invites[invites.length - 1];
-          const friendPayload = {
-            id: latest.fromUid,
-            nickname: latest.fromNickname,
-            avatarColor: latest.fromAvatarColor,
-            lunchPlan: latest.lunchPlan,
-            inviteId: latest.id,
-          };
-          triggerNotification(
-            "收到约饭邀请",
-            `${friendPayload.nickname} 想加入你的饭局`,
-            "incoming_invite",
-            { friend: friendPayload }
-          );
+        if (invites.length > invitePrevCountRef.current || latestInvite) {
+          const latest = latestInvite || invites[invites.length - 1];
+          if (latest) {
+            const friendPayload = {
+              id: latest.fromUid,
+              nickname: latest.fromNickname,
+              avatarColor: latest.fromAvatarColor,
+              lunchPlan: latest.lunchPlan,
+              inviteId: latest.id,
+            };
+            triggerNotification(
+              "收到约饭邀请",
+              `${friendPayload.nickname} 想加入你的饭局`,
+              "incoming_invite",
+              { friend: friendPayload }
+            );
+          }
         }
         invitePrevCountRef.current = invites.length;
       },
@@ -843,6 +876,7 @@ export default function LunchBuddyApp() {
 
   const sendInviteToFriend = async (targetFriend, plan) => {
     if (!db || !user || !targetFriend?.id) return;
+    const now = new Date().toISOString();
     const inviteRef = doc(
       db,
       "artifacts",
@@ -858,7 +892,8 @@ export default function LunchBuddyApp() {
         fromNickname: userProfile?.nickname || "好友",
         fromAvatarColor: userProfile?.avatarColor || "bg-orange-500",
         lunchPlan: plan,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
       });
     } catch (error) {
       console.error("Send invite failed:", error);
