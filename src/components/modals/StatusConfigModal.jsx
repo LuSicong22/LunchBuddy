@@ -1,5 +1,14 @@
-import React from 'react';
-import { Clock, Eye, EyeOff, MapPin, Target, Users, Utensils, X } from 'lucide-react';
+import React from "react";
+import {
+  Clock,
+  Eye,
+  EyeOff,
+  MapPin,
+  Target,
+  Users,
+  Utensils,
+  X,
+} from "lucide-react";
 
 export function StatusConfigModal({
   isOpen,
@@ -7,28 +16,38 @@ export function StatusConfigModal({
   onClose,
   onConfirm,
   onUpdate,
-  onTogglePrivacy
+  onTogglePrivacy,
 }) {
   if (!isOpen) return null;
 
-  const foodPresets = ['随意', '淮南牛肉汤', '麻辣香锅', '菜饭', '私聊'];
-  const locationPresets = ['随意', '老巴刹', '私聊'];
+  const foodPresets = ["随意", "淮南牛肉汤", "麻辣香锅", "菜饭", "私聊"];
+  const locationPresets = ["随意", "老巴刹", "私聊"];
 
   const setLunchDetails = (details) => onUpdate(details);
   const clearIfDefault = (field) => {
-    if (lunchDetails[field] === '随意') {
-      setLunchDetails({ ...lunchDetails, [field]: '' });
+    if (lunchDetails[field] === "随意") {
+      setLunchDetails({ ...lunchDetails, [field]: "" });
     }
   };
+  const toggleGroupPreference = () =>
+    setLunchDetails({
+      ...lunchDetails,
+      preferFriendsOnlyGroup: !lunchDetails.preferFriendsOnlyGroup,
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      ></div>
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative animate-bounce-in z-10 max-h-[90vh] flex flex-col border border-gray-100">
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
             <Target size={22} className="text-orange-500" />
-            <h2 className="text-lg font-bold text-gray-900 leading-tight">精准组局</h2>
+            <h2 className="text-lg font-bold text-gray-900 leading-tight">
+              精准组局
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -46,17 +65,17 @@ export function StatusConfigModal({
                 <Utensils size={16} className="text-orange-500" /> 想吃什么
               </div>
               <button
-                onClick={() => onTogglePrivacy('hideFood')}
+                onClick={() => onTogglePrivacy("hideFood")}
                 className={`text-xs px-2 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
                   lunchDetails.hideFood
-                    ? 'border-orange-200 bg-orange-50 text-orange-600'
-                    : 'border-transparent text-gray-400 hover:border-gray-200'
+                    ? "border-orange-200 bg-orange-50 text-orange-600"
+                    : "border-transparent text-gray-400 hover:border-gray-200"
                 }`}
               >
                 {lunchDetails.hideFood ? (
                   <>
                     <EyeOff size={14} />
-                    <span>仅自己</span>
+                    <span>隐藏</span>
                   </>
                 ) : (
                   <>
@@ -69,9 +88,11 @@ export function StatusConfigModal({
             <input
               type="text"
               value={lunchDetails.food}
-              onChange={(e) => setLunchDetails({ ...lunchDetails, food: e.target.value })}
+              onChange={(e) =>
+                setLunchDetails({ ...lunchDetails, food: e.target.value })
+              }
               placeholder="想吃的菜名"
-              onFocus={() => clearIfDefault('food')}
+              onFocus={() => clearIfDefault("food")}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
             />
             <div className="flex flex-wrap gap-2">
@@ -80,11 +101,71 @@ export function StatusConfigModal({
                 return (
                   <button
                     key={item}
-                    onClick={() => setLunchDetails({ ...lunchDetails, food: item })}
+                    onClick={() =>
+                      setLunchDetails({ ...lunchDetails, food: item })
+                    }
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
                       active
-                        ? 'bg-orange-500 text-white border-orange-500'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-purple-500" /> 目标地点
+              </div>
+              <button
+                onClick={() => onTogglePrivacy("hideLocation")}
+                className={`text-xs px-2 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
+                  lunchDetails.hideLocation
+                    ? "border-purple-200 bg-purple-50 text-purple-600"
+                    : "border-transparent text-gray-400 hover:border-gray-200"
+                }`}
+              >
+                {lunchDetails.hideLocation ? (
+                  <>
+                    <EyeOff size={14} />
+                    <span>隐藏</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={14} />
+                    <span>公开</span>
+                  </>
+                )}
+              </button>
+            </label>
+            <input
+              type="text"
+              value={lunchDetails.location}
+              onChange={(e) =>
+                setLunchDetails({ ...lunchDetails, location: e.target.value })
+              }
+              placeholder="想去的地点"
+              onFocus={() => clearIfDefault("location")}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+            />
+            <div className="flex flex-wrap gap-2">
+              {locationPresets.map((item) => {
+                const active = lunchDetails.location === item;
+                return (
+                  <button
+                    key={item}
+                    onClick={() =>
+                      setLunchDetails({ ...lunchDetails, location: item })
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
+                      active
+                        ? "bg-purple-500 text-white border-purple-500"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                     }`}
                   >
                     {item}
@@ -101,7 +182,9 @@ export function StatusConfigModal({
               </label>
               <select
                 value={lunchDetails.size}
-                onChange={(e) => setLunchDetails({ ...lunchDetails, size: e.target.value })}
+                onChange={(e) =>
+                  setLunchDetails({ ...lunchDetails, size: e.target.value })
+                }
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 appearance-none"
               >
                 <option value="随意">随意</option>
@@ -117,7 +200,9 @@ export function StatusConfigModal({
               </label>
               <select
                 value={lunchDetails.time}
-                onChange={(e) => setLunchDetails({ ...lunchDetails, time: e.target.value })}
+                onChange={(e) =>
+                  setLunchDetails({ ...lunchDetails, time: e.target.value })
+                }
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-200 appearance-none"
               >
                 <option value="随意">随意</option>
@@ -130,58 +215,18 @@ export function StatusConfigModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MapPin size={16} className="text-purple-500" /> 目标地点
-              </div>
-              <button
-                onClick={() => onTogglePrivacy('hideLocation')}
-                className={`text-xs px-2 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
-                  lunchDetails.hideLocation
-                    ? 'border-purple-200 bg-purple-50 text-purple-600'
-                    : 'border-transparent text-gray-400 hover:border-gray-200'
-                }`}
-              >
-                {lunchDetails.hideLocation ? (
-                  <>
-                    <EyeOff size={14} />
-                    <span>仅自己</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye size={14} />
-                    <span>公开</span>
-                  </>
-                )}
-              </button>
-            </label>
-            <input
-              type="text"
-              value={lunchDetails.location}
-              onChange={(e) => setLunchDetails({ ...lunchDetails, location: e.target.value })}
-              placeholder="想去的地点"
-              onFocus={() => clearIfDefault('location')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-            />
-            <div className="flex flex-wrap gap-2">
-              {locationPresets.map((item) => {
-                const active = lunchDetails.location === item;
-                return (
-                  <button
-                    key={item}
-                    onClick={() => setLunchDetails({ ...lunchDetails, location: item })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
-                      active
-                        ? 'bg-purple-500 text-white border-purple-500'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
+            <span className="text-sm font-bold text-gray-800">多人偏好</span>
+            <button
+              onClick={toggleGroupPreference}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
+                lunchDetails.preferFriendsOnlyGroup
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {lunchDetails.preferFriendsOnlyGroup ? "仅好友" : "不限"}
+            </button>
           </div>
         </div>
 

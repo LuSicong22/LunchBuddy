@@ -27,6 +27,7 @@ import {
   SquarePlus,
   UserPlus,
   LogIn,
+  Download,
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -74,6 +75,41 @@ const appId =
     ? __app_id
     : import.meta.env.VITE_APP_ID || "default-app-id";
 const localProfileStorageKey = `lunchbuddy_local_profile_${appId}`;
+
+const MealIcon = ({ className = "" }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path
+      d="M5 11h14c0 3.5-3 6.5-7 6.5S5 14.5 5 11Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <line
+      x1="13.5"
+      y1="3"
+      x2="10.5"
+      y2="11"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="16.5"
+      y1="4"
+      x2="13.2"
+      y2="12"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
 
 export default function LunchBuddyApp() {
   const [user, setUser] = useState(null);
@@ -128,6 +164,7 @@ export default function LunchBuddyApp() {
     location: "随意",
     hideFood: false,
     hideLocation: false,
+    preferFriendsOnlyGroup: true,
   });
 
   const [diningViewMode, setDiningViewMode] = useState("me");
@@ -404,6 +441,7 @@ export default function LunchBuddyApp() {
       location: "随意",
       hideFood: false,
       hideLocation: false,
+      preferFriendsOnlyGroup: true,
     };
     setLunchDetails(defaultDetails);
     setPreviousStatus(null);
@@ -419,6 +457,7 @@ export default function LunchBuddyApp() {
       location: "随意",
       hideFood: false,
       hideLocation: false,
+      preferFriendsOnlyGroup: true,
     });
     setPreviousStatus(null);
     setShowStatusConfig(true);
@@ -572,8 +611,7 @@ export default function LunchBuddyApp() {
     if (!s1 || !s2) return true;
     if (s1 === "随意" || s2 === "随意") return true;
     if (s1.includes(s2) || s2.includes(s1)) return true;
-    const [shorter, longer] =
-      s1.length <= s2.length ? [s1, s2] : [s2, s1];
+    const [shorter, longer] = s1.length <= s2.length ? [s1, s2] : [s2, s1];
     if (shorter.length < minLen) return false;
     for (let len = minLen; len <= shorter.length; len++) {
       for (let i = 0; i <= shorter.length - len; i++) {
@@ -617,7 +655,7 @@ export default function LunchBuddyApp() {
         ? userProfile?.nickname || "我"
         : profile?.nickname || p.name || "嘉宾";
       const avatarColor = p.isSelf
-        ? "bg-emerald-500"
+        ? userProfile?.avatarColor || "bg-orange-500"
         : profile?.avatarColor || "bg-gray-300";
       return {
         id: profile?.id ?? `guest-${idx}`,
@@ -631,6 +669,10 @@ export default function LunchBuddyApp() {
     friends.find((f) => f.id === participant.friendId);
   const eventHasFriend = (event) =>
     event.participants.some((p) => !!getParticipantProfile(p));
+  const eventAllFriends = (event) =>
+    (event.participants || []).every(
+      (p) => p.isSelf || !!getParticipantProfile(p)
+    );
   const handleJoinOpenEvent = (event) => {
     if (event.joined || !eventHasFriend(event)) return;
 
@@ -797,7 +839,7 @@ export default function LunchBuddyApp() {
             onClick={() => initiateDateFriend(friend)}
             className="flex items-center justify-center px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md text-sm font-bold gap-1 active:scale-95"
           >
-            <HandPlatter size={16} /> 约一下
+            <HandPlatter size={16} /> 约
           </button>
         </div>
       </div>
@@ -856,42 +898,34 @@ export default function LunchBuddyApp() {
                   {confirmedDining.isGroup
                     ? "已加入饭局 🎉"
                     : diningViewMode === "me"
-                    ? "饭局已确认 🎉"
+                    ? "已加入饭局 🎉"
                     : "收到饭局邀请 🎉"}
                 </h2>
-                <div className="absolute -bottom-10 flex gap-3 justify-center w-full px-4">
-                  {confirmedDining.isGroup ? (
-                    <div className="flex -space-x-3 bg-white/20 px-3 py-2 rounded-full shadow-lg backdrop-blur-sm">
-                      {confirmedDining.participants
-                        ?.slice(0, 4)
-                        .map((p, idx) => (
-                          <div
-                            key={p.id}
-                            className={`w-12 h-12 rounded-full ${
-                              p.avatarColor
-                            } border-2 border-white flex items-center justify-center text-white font-bold text-lg shadow-sm z-[${
-                              10 - idx
-                            }]`}
-                          >
-                            {p.nickname[0]}
-                          </div>
-                        ))}
-                      {confirmedDining.participants?.length > 4 && (
-                        <div className="w-12 h-12 rounded-full bg-white/70 border-2 border-white flex items-center justify-center text-gray-500 text-sm font-bold shadow-sm">
-                          +{confirmedDining.participants.length - 4}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div
-                      className={`w-20 h-20 rounded-full ${confirmedDining.partner.avatarColor} border-4 border-white shadow-md flex items-center justify-center text-white font-bold text-2xl`}
-                    >
-                      {confirmedDining.partner.nickname[0]}
-                    </div>
-                  )}
-                </div>
               </div>
-              <div className="pt-12 pb-6 px-6 text-center space-y-5">
+              <div className="pt-6 pb-6 px-6 text-center space-y-5">
+                <div className="flex justify-center">
+                  <div className="flex -space-x-3 bg-white px-3 py-2 rounded-full shadow-md border border-gray-100">
+                    {(confirmedDining.participants || [])
+                      .slice(0, 5)
+                      .map((p, idx) => (
+                        <div
+                          key={p.id}
+                          className={`w-12 h-12 rounded-full ${
+                            p.avatarColor
+                          } border-2 border-white flex items-center justify-center text-white font-bold text-lg shadow-sm z-[${
+                            10 - idx
+                          }]`}
+                        >
+                          {p.nickname[0]}
+                        </div>
+                      ))}
+                    {confirmedDining.participants?.length > 5 && (
+                      <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-600 text-sm font-bold shadow-sm">
+                        +{confirmedDining.participants.length - 5}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 {confirmedDining.isGroup ? (
                   <div className="space-y-3">
                     <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">
@@ -905,9 +939,6 @@ export default function LunchBuddyApp() {
                   </div>
                 ) : (
                   <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-wide font-semibold">
-                      PARTNER
-                    </p>
                     <p className="text-gray-800 font-bold text-lg">
                       {(userProfile?.nickname || "我") +
                         " & " +
@@ -989,7 +1020,7 @@ export default function LunchBuddyApp() {
                         onClick={handleInitiateCancel}
                         className="text-red-400 text-sm font-medium hover:text-red-500"
                       >
-                        取消/结束饭局
+                        退出饭局
                       </button>
                     </>
                   ) : diningViewMode === "me" ? (
@@ -1001,7 +1032,7 @@ export default function LunchBuddyApp() {
                         onClick={handleInitiateCancel}
                         className="text-red-400 text-sm font-medium hover:text-red-500"
                       >
-                        取消/结束饭局
+                        退出饭局
                       </button>
                     </>
                   ) : (
@@ -1046,7 +1077,11 @@ export default function LunchBuddyApp() {
             time,
             location,
           });
-          if (isPlanMatch) matchedItems.push(item);
+          const passesGroupPref =
+            !lunchDetails.preferFriendsOnlyGroup ||
+            !isGroupDining(item.data) ||
+            eventAllFriends(item.data);
+          if (isPlanMatch && passesGroupPref) matchedItems.push(item);
           else otherItems.push(item);
           return;
         }
@@ -1062,8 +1097,8 @@ export default function LunchBuddyApp() {
         <div className="bg-white px-6 pt-10 pb-6 rounded-b-3xl shadow-sm z-10 transition-all duration-300">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-sm">
-                <Utensils size={20} />
+              <div className="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-sm">
+                <MealIcon className="w-8 h-8" />
               </div>
               <div className="text-lg font-bold text-gray-900">饭搭子</div>
             </div>
@@ -1072,7 +1107,9 @@ export default function LunchBuddyApp() {
               className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 active:scale-95 transition-transform"
             >
               <div
-                className={`w-9 h-9 rounded-full ${userProfile?.avatarColor || "bg-orange-500"} text-white flex items-center justify-center font-bold`}
+                className={`w-9 h-9 rounded-full ${
+                  userProfile?.avatarColor || "bg-orange-500"
+                } text-white flex items-center justify-center font-bold`}
               >
                 {(userProfile?.nickname || "我")[0]}
               </div>
@@ -1618,59 +1655,24 @@ export default function LunchBuddyApp() {
           friendRequestCount={friendRequests.length}
         />
         {showInstallPrompt && !isStandalone && (
-          <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
-            <div className="bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-start gap-3">
-              <div className="p-2.5 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900">
-                <SquarePlus size={18} strokeWidth={2.5} />
+          <div className="fixed top-4 left-4 right-4 z-40 animate-slide-down">
+            <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 px-4 py-3 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-orange-400">
+                <Download size={20} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-gray-800">添加到主屏幕</p>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  {installPromptEvent
-                    ? "安装 LunchBuddy 到桌面，获取更便捷的启动体验与提醒。"
-                    : isIos
-                    ? "在浏览器底部的分享菜单中选择 “添加到主屏幕”，即可快速打开 LunchBuddy。"
-                    : "在浏览器菜单中选择 “添加到主屏幕/安装应用”，即可更方便地启动 LunchBuddy。"}
-                </p>
-                {showInstallGuide && !installPromptEvent && (
-                  <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600 leading-relaxed">
-                    <p className="font-semibold text-gray-800 mb-1">
-                      添加步骤：
-                    </p>
-                    {isIos ? (
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>点击浏览器底部的分享图标</li>
-                        <li>选择 “添加到主屏幕”</li>
-                        <li>点击右上角 “添加” 完成安装</li>
-                      </ol>
-                    ) : (
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>打开浏览器菜单（⋮/…）</li>
-                        <li>找到 “添加到主屏幕” 或 “安装应用”</li>
-                        <li>确认添加后即可从桌面打开 LunchBuddy</li>
-                      </ol>
-                    )}
-                  </div>
-                )}
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={handleInstallApp}
-                    className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl font-bold shadow-md active:scale-95 transition-transform"
-                  >
-                    {installPromptEvent
-                      ? "立即添加"
-                      : showInstallGuide
-                      ? "收起指引"
-                      : "查看指引"}
-                  </button>
-                  <button
-                    onClick={handleDismissInstallPrompt}
-                    className="px-3 py-2 text-xs text-gray-500 bg-gray-100 rounded-xl font-medium hover:bg-gray-200"
-                  >
-                    稍后再说
-                  </button>
+                <div className="text-sm font-bold">添加到主屏幕</div>
+                <div className="text-xs text-gray-200 mt-1 leading-relaxed">
+                  接收饭局推送，请点击浏览器分享菜单选择“添加到主屏幕”。
                 </div>
               </div>
+              <button
+                onClick={handleDismissInstallPrompt}
+                className="text-gray-400 hover:text-white p-1 rounded-lg active:scale-95"
+                aria-label="关闭"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
         )}
