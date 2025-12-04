@@ -18,7 +18,6 @@ import {
   MessageSquare,
   BellRing,
   Check,
-  RefreshCw,
   ArrowRight,
   Copy,
   Edit2,
@@ -37,13 +36,17 @@ import {
   signInWithCustomToken,
 } from "firebase/auth";
 import {
+  collection,
   doc,
+  getDocs,
   getFirestore,
   onSnapshot,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
-import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES } from "./constants";
+import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES, USE_MOCK_DATA } from "./constants";
 import { NotificationOverlay } from "./components/NotificationOverlay";
 import { Navigation } from "./components/Navigation";
 import { StatusConfigModal } from "./components/modals/StatusConfigModal";
@@ -51,13 +54,15 @@ import { useFriends } from "./hooks/useFriends";
 import { copyToClipboard } from "./utils/clipboard";
 import { generateShortId } from "./utils/id";
 
-const firebaseConfig = (() => {
-  if (typeof __firebase_config !== "undefined")
-    return JSON.parse(__firebase_config);
-  if (import.meta.env.VITE_FIREBASE_CONFIG)
-    return JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
-  return null;
-})();
+const firebaseConfig = {
+  apiKey: "AIzaSyAg-M2LPgOkoo3Jbu5U_aE9iNzrUzMVpNQ",
+  authDomain: "lunchbuddy-fee94.firebaseapp.com",
+  projectId: "lunchbuddy-fee94",
+  storageBucket: "lunchbuddy-fee94.firebasestorage.app",
+  messagingSenderId: "692783124796",
+  appId: "1:692783124796:web:da504dbb1b7733f16dce39",
+  measurementId: "G-WFTVFKV24Q",
+};
 
 let app = null;
 let auth = null;
@@ -131,23 +136,22 @@ export default function LunchBuddyApp() {
     newFriendId,
     setNewFriendId,
     friendToDelete,
-    setFriendToDelete,
-    showNoteModal,
-    setShowNoteModal,
-    currentNoteFriend,
-    setCurrentNoteFriend,
+  setFriendToDelete,
+  showNoteModal,
+  setShowNoteModal,
+  currentNoteFriend,
+  setCurrentNoteFriend,
     noteInput,
     setNoteInput,
     showFriendRequestModal,
     setShowFriendRequestModal,
-    simulateFriendRequest,
-    acceptFriendRequest,
-    handleAddFriend,
-    initiateDeleteFriend,
-    confirmDeleteFriend,
-    openNoteModal,
-    handleSaveNote,
-  } = useFriends();
+  acceptFriendRequest,
+  handleAddFriend,
+  initiateDeleteFriend,
+  confirmDeleteFriend,
+  openNoteModal,
+  handleSaveNote,
+  } = useFriends({ db, user, appId });
 
   const [confirmedDining, setConfirmedDining] = useState(null);
   const [friendToDate, setFriendToDate] = useState(null);
@@ -174,7 +178,9 @@ export default function LunchBuddyApp() {
 
   const [notification, setNotification] = useState(null);
 
-  const [openDiningEvents, setOpenDiningEvents] = useState(INITIAL_OPEN_EVENTS);
+  const [openDiningEvents, setOpenDiningEvents] = useState(
+    USE_MOCK_DATA ? INITIAL_OPEN_EVENTS : []
+  );
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -297,6 +303,18 @@ export default function LunchBuddyApp() {
             const data = docSnap.data();
             setUserProfile(data);
             setEditedName(data.nickname);
+            if (data.status === "active") {
+              setMyStatus("active");
+              const plan = data.lunchPlan || {};
+              setLunchDetails((prev) => ({
+                ...prev,
+                ...plan,
+                preferFriendsOnlyGroup:
+                  plan.preferFriendsOnlyGroup ?? prev.preferFriendsOnlyGroup,
+              }));
+            } else {
+              setMyStatus(null);
+            }
           } else {
             setUserProfile(null);
           }
@@ -364,21 +382,27 @@ export default function LunchBuddyApp() {
     try {
       const profileRef = doc(
         db,
-        "artifacts",
-        appId,
-        "users",
-        user.uid,
-        "data",
-        "profile"
-      );
-      await setDoc(profileRef, {
+      "artifacts",
+      appId,
+      "users",
+      user.uid,
+      "data",
+      "profile"
+    );
+      const profileData = {
+        uid: user.uid,
         nickname: registrationName,
         createdAt: new Date().toISOString(),
         avatarColor: `bg-${
           ["orange", "blue", "green", "purple"][Math.floor(Math.random() * 4)]
         }-500`,
         shortId: generateShortId(),
-      });
+        status: "inactive",
+        lunchPlan: null,
+      };
+      await setDoc(profileRef, profileData);
+      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+      await setDoc(userDocRef, profileData);
     } catch (error) {
       console.error("Registration failed:", error);
       alert("注册失败");
@@ -411,26 +435,12 @@ export default function LunchBuddyApp() {
       "data",
       "profile"
     );
-    await updateDoc(profileRef, { nickname: editedName });
+    const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+    await Promise.all([
+      setDoc(profileRef, { nickname: editedName }, { merge: true }),
+      setDoc(userDocRef, { nickname: editedName }, { merge: true }),
+    ]);
     setIsEditingName(false);
-  };
-
-  const simulateIncomingInvite = (friend) => {
-    triggerNotification(
-      "收到约饭邀请",
-      `${friend.nickname} 想要和你约饭`,
-      "incoming_invite",
-      { friend }
-    );
-  };
-
-  const handleSimulateFriendRequest = () => {
-    const request = simulateFriendRequest();
-    triggerNotification(
-      "新好友请求",
-      `${request.nickname} 请求添加你为好友`,
-      "friend_request"
-    );
   };
 
   const handleQuickStart = () => {
@@ -446,7 +456,6 @@ export default function LunchBuddyApp() {
     setLunchDetails(defaultDetails);
     setPreviousStatus(null);
     setMyStatus("active");
-    checkForPerfectMatch(defaultDetails);
   };
 
   const handleCustomStart = () => {
@@ -463,33 +472,67 @@ export default function LunchBuddyApp() {
     setShowStatusConfig(true);
   };
 
-  const confirmPublishStatus = () => {
+  const confirmPublishStatus = async () => {
     setPreviousStatus(null);
     setMyStatus("active");
     setShowStatusConfig(false);
-    checkForPerfectMatch(lunchDetails);
-  };
-
-  const checkForPerfectMatch = (details) => {
-    const activeFriends = friends.filter((f) => f.status === "active");
-    const perfectMatch = activeFriends.find((f) =>
-      checkIsMatch(details, f.lunchPlan)
-    );
-    if (perfectMatch) {
-      setTimeout(() => {
-        triggerNotification(
-          "发现完美匹配 ✨",
-          `你和 ${perfectMatch.nickname} 的口味很合！`,
-          "perfect_match",
-          { friend: perfectMatch }
-        );
-      }, 1000);
+    if (db && user) {
+      const profileRef = doc(
+        db,
+        "artifacts",
+        appId,
+        "users",
+        user.uid,
+        "data",
+        "profile"
+      );
+      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+      const payload = {
+        status: "active",
+        lunchPlan: lunchDetails,
+      };
+      try {
+        await Promise.all([
+          setDoc(profileRef, payload, { merge: true }),
+          setDoc(userDocRef, payload, { merge: true }),
+        ]);
+      } catch (error) {
+        console.error("Publish status failed:", error);
+      }
     }
   };
 
-  const handleStopStatus = () => {
+  const handleStopStatus = async () => {
     setPreviousStatus(null);
     setMyStatus(null);
+    if (db && user) {
+      const profileRef = doc(
+        db,
+        "artifacts",
+        appId,
+        "users",
+        user.uid,
+        "data",
+        "profile"
+      );
+      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+      try {
+        await Promise.all([
+          setDoc(
+            profileRef,
+            { status: "inactive", lunchPlan: null },
+            { merge: true }
+          ),
+          setDoc(
+            userDocRef,
+            { status: "inactive", lunchPlan: null },
+            { merge: true }
+          ),
+        ]);
+      } catch (error) {
+        console.error("Stop status failed:", error);
+      }
+    }
   };
   const togglePrivacy = (field) =>
     setLunchDetails((p) => ({ ...p, [field]: !p[field] }));
@@ -873,22 +916,12 @@ export default function LunchBuddyApp() {
     if (confirmedDining) {
       return (
         <div className="flex flex-col h-full bg-orange-50">
-          <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10 flex justify-between items-center">
+          <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10 flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-800">当前饭局</h1>
-            {confirmedDining.isGroup ? (
+            {confirmedDining.isGroup && (
               <div className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full border border-orange-100">
                 多人饭局
               </div>
-            ) : (
-              <button
-                onClick={() =>
-                  setDiningViewMode(diningViewMode === "me" ? "partner" : "me")
-                }
-                className="flex items-center gap-1 text-xs bg-white/50 px-2 py-1 rounded-full text-gray-500 hover:bg-white transition-colors"
-              >
-                <RefreshCw size={12} />{" "}
-                {diningViewMode === "me" ? "模拟对方视角" : "返回我的视角"}
-              </button>
             )}
           </div>
           <div className="flex-1 p-5 pt-3 pb-24 flex flex-col items-center overflow-y-auto">
@@ -1343,23 +1376,6 @@ export default function LunchBuddyApp() {
           </div>
         </div>
 
-        <div className="flex gap-2 px-6 py-2 overflow-x-auto">
-          <button
-            onClick={handleSimulateFriendRequest}
-            className="text-xs border border-gray-300 px-2 py-1 rounded bg-gray-50 whitespace-nowrap hover:bg-gray-100"
-          >
-            ⚡️模拟好友请求
-          </button>
-          {friends.length > 0 && (
-            <button
-              onClick={() => simulateIncomingInvite(friends[0])}
-              className="text-xs border border-gray-300 px-2 py-1 rounded bg-gray-50 whitespace-nowrap hover:bg-gray-100"
-            >
-              ⚡️模拟收到邀请
-            </button>
-          )}
-        </div>
-
         <div className="flex justify-between items-center px-6 py-3">
           <h2 className="font-bold text-gray-700">
             我的好友 ({friends.length})
@@ -1374,6 +1390,11 @@ export default function LunchBuddyApp() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 pt-0 pb-24 space-y-3">
+          {friends.length === 0 && (
+            <div className="bg-white border border-dashed border-gray-200 rounded-xl p-4 text-center text-gray-500 text-sm shadow-sm">
+              让朋友把他的 ID 给你，点右上角「添加好友」输入即可互加。
+            </div>
+          )}
           {friends.map((friend) => (
             <div
               key={friend.id}
@@ -1588,13 +1609,13 @@ export default function LunchBuddyApp() {
     return (
       <div className="bg-white h-screen flex flex-col px-8 pt-20 pb-10">
         <div className="flex-1">
-          <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-            <Utensils size={32} className="text-orange-500" />
+          <div className="w-14 h-14 rounded-xl bg-orange-500 text-white flex items-center justify-center mb-6 shadow-sm">
+            <MealIcon className="w-10 h-10" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             欢迎来到
             <br />
-            LunchBuddy
+            饭搭子
           </h1>
           <p className="text-gray-500 mb-10">只需一步，开启你的蹭饭之旅。</p>
           <form onSubmit={handleRegistration}>

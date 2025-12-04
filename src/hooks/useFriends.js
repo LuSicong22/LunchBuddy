@@ -1,9 +1,19 @@
-import { useCallback, useState } from 'react';
-import { INITIAL_FRIENDS } from '../constants';
-import { generateShortId } from '../utils/id';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+  where
+} from 'firebase/firestore';
+import { INITIAL_FRIENDS, USE_MOCK_DATA } from '../constants';
 
-export function useFriends() {
-  const [friends, setFriends] = useState(INITIAL_FRIENDS);
+export function useFriends({ db, user, appId }) {
+  const [friends, setFriends] = useState(USE_MOCK_DATA ? INITIAL_FRIENDS : []);
   const [friendRequests, setFriendRequests] = useState([]);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [newFriendId, setNewFriendId] = useState('');
@@ -13,12 +23,64 @@ export function useFriends() {
   const [noteInput, setNoteInput] = useState('');
   const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
 
-  const simulateFriendRequest = useCallback(() => {
-    const randomId = generateShortId();
-    const newRequest = { id: Date.now(), nickname: `新朋友_${randomId}`, shortId: randomId, avatarColor: 'bg-indigo-500' };
-    setFriendRequests((prev) => [...prev, newRequest]);
-    return newRequest;
-  }, []);
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+    if (!db || !user) {
+      setFriends([]);
+      return;
+    }
+
+    const friendsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'friends');
+    let unsubscribeFriendDetails = null;
+
+    const unsubFriends = onSnapshot(
+      friendsRef,
+      (snapshot) => {
+        const friendIds = snapshot.docs.map((docSnap) => docSnap.data().uid || docSnap.id);
+        const noteMap = snapshot.docs.reduce((acc, docSnap) => {
+          const data = docSnap.data();
+          const targetId = data.uid || docSnap.id;
+          acc[targetId] = data.note || '';
+          return acc;
+        }, {});
+
+        if (unsubscribeFriendDetails) {
+          unsubscribeFriendDetails();
+          unsubscribeFriendDetails = null;
+        }
+
+        if (friendIds.length === 0) {
+          setFriends([]);
+          return;
+        }
+
+        const limitedIds = friendIds.slice(0, 10); // Firestore "in" queries support up to 10.
+        const usersRef = collection(db, 'artifacts', appId, 'users');
+        const detailQuery = query(usersRef, where('uid', 'in', limitedIds));
+        unsubscribeFriendDetails = onSnapshot(
+          detailQuery,
+          (userSnaps) => {
+            const realFriends = userSnaps.docs.map((docSnap) => {
+              const data = docSnap.data();
+              return {
+                id: data.uid,
+                ...data,
+                note: noteMap[data.uid] || ''
+              };
+            });
+            setFriends(realFriends);
+          },
+          (error) => console.error('Friends detail listen error:', error)
+        );
+      },
+      (error) => console.error('Friends listen error:', error)
+    );
+
+    return () => {
+      unsubFriends();
+      if (unsubscribeFriendDetails) unsubscribeFriendDetails();
+    };
+  }, [db, user, appId]);
 
   const acceptFriendRequest = useCallback(
     (request) => {
@@ -30,33 +92,64 @@ export function useFriends() {
     [friendRequests.length]
   );
 
-  const handleAddFriend = useCallback(() => {
+  const handleAddFriend = useCallback(async () => {
     if (!newFriendId.trim() || newFriendId.length !== 6) {
       alert('请输入6位数字ID');
       return;
     }
-    const newFriend = {
-      id: Date.now(),
-      nickname: `用户_${newFriendId}`,
-      wechatId: 'unknown',
-      shortId: newFriendId,
-      note: '',
-      avatarColor: `bg-${['purple', 'indigo', 'teal', 'red'][Math.floor(Math.random() * 4)]}-500`,
-      status: 'active',
-      lunchPlan: { food: '随便吃点', size: '随意', time: '12:00', location: '附近', hideFood: false, hideLocation: false }
-    };
-    setFriends((prev) => [...prev, newFriend]);
-    setNewFriendId('');
-    setShowAddFriendModal(false);
-  }, [newFriendId]);
+    if (!db || !user) {
+      alert('当前离线模式，无法添加好友');
+      return;
+    }
+    try {
+      const usersRef = collection(db, 'artifacts', appId, 'users');
+      const q = query(usersRef, where('shortId', '==', newFriendId));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        alert('未找到该 ID 的用户，请确认对方已注册');
+        return;
+      }
+
+      const friendDoc = querySnapshot.docs[0];
+      const friendData = friendDoc.data();
+
+      if (friendData.uid === user.uid) {
+        alert('不能添加自己为好友');
+        return;
+      }
+
+      const myFriendRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friends', friendData.uid);
+      await setDoc(myFriendRef, {
+        uid: friendData.uid,
+        addedAt: new Date().toISOString(),
+        note: ''
+      });
+
+      alert(`成功添加 ${friendData.nickname}！`);
+      setNewFriendId('');
+      setShowAddFriendModal(false);
+    } catch (error) {
+      console.error('Add friend error:', error);
+      alert('添加失败，请重试');
+    }
+  }, [appId, db, newFriendId, user]);
 
   const initiateDeleteFriend = useCallback((friend) => setFriendToDelete(friend), []);
-  const confirmDeleteFriend = useCallback(() => {
+  const confirmDeleteFriend = useCallback(async () => {
     if (friendToDelete) {
+      if (db && user) {
+        try {
+          const friendRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friends', friendToDelete.id);
+          await deleteDoc(friendRef);
+        } catch (error) {
+          console.error('Delete friend error:', error);
+        }
+      }
       setFriends((prev) => prev.filter((f) => f.id !== friendToDelete.id));
       setFriendToDelete(null);
     }
-  }, [friendToDelete]);
+  }, [appId, db, friendToDelete, user]);
 
   const openNoteModal = useCallback((friend) => {
     setCurrentNoteFriend(friend);
@@ -64,12 +157,20 @@ export function useFriends() {
     setShowNoteModal(true);
   }, []);
 
-  const handleSaveNote = useCallback(() => {
+  const handleSaveNote = useCallback(async () => {
     if (currentNoteFriend) {
+      if (db && user) {
+        try {
+          const noteRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friends', currentNoteFriend.id);
+          await updateDoc(noteRef, { note: noteInput });
+        } catch (error) {
+          console.error('Save note error:', error);
+        }
+      }
       setFriends((prev) => prev.map((f) => (f.id === currentNoteFriend.id ? { ...f, note: noteInput } : f)));
     }
     setShowNoteModal(false);
-  }, [currentNoteFriend, noteInput]);
+  }, [appId, currentNoteFriend, db, noteInput, user]);
 
   return {
     friends,
@@ -90,7 +191,6 @@ export function useFriends() {
     setNoteInput,
     showFriendRequestModal,
     setShowFriendRequestModal,
-    simulateFriendRequest,
     acceptFriendRequest,
     handleAddFriend,
     initiateDeleteFriend,
