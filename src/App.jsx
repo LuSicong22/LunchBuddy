@@ -359,13 +359,34 @@ export default function LunchBuddyApp() {
     }
   };
 
+  const normalizeNickname = (name) =>
+    (name || "").slice(0, NICKNAME_MAX_LENGTH);
+
+  const applyNicknameDraft = (setter) => (value) => {
+    const next = isComposingName ? value : normalizeNickname(value);
+    setter(next);
+  };
+
+  const startEditingNickname = () => {
+    setEditedName(normalizeNickname(userProfile?.nickname || ""));
+    setIsEditingName(true);
+    setIsComposingName(false);
+  };
+
+  const handleCancelEditNickname = () => {
+    setEditedName(normalizeNickname(userProfile?.nickname || ""));
+    setIsEditingName(false);
+    setIsComposingName(false);
+  };
+
   const handleRegistration = async (e) => {
     e.preventDefault();
-    if (!registrationName.trim() || !user) return;
+    const finalName = normalizeNickname(registrationName.trim());
+    if (!finalName || !user) return;
     setIsRegistering(true);
     if (!db || !auth) {
       const localProfile = {
-        nickname: registrationName,
+        nickname: finalName,
         createdAt: new Date().toISOString(),
         avatarColor: "bg-orange-500",
         shortId: generateShortId(),
@@ -377,7 +398,7 @@ export default function LunchBuddyApp() {
         );
       }
       setUserProfile(localProfile);
-      setEditedName(localProfile.nickname);
+      setEditedName(finalName);
       setIsRegistering(false);
       return;
     }
@@ -394,7 +415,7 @@ export default function LunchBuddyApp() {
     );
       const profileData = {
         uid: user.uid,
-        nickname: registrationName,
+        nickname: finalName,
         createdAt: new Date().toISOString(),
         avatarColor: `bg-${
           ["orange", "blue", "green", "purple"][Math.floor(Math.random() * 4)]
@@ -414,10 +435,11 @@ export default function LunchBuddyApp() {
   };
 
   const handleUpdateNickname = async () => {
-    if (!editedName.trim() || !user) return;
+    const finalName = normalizeNickname(editedName.trim());
+    if (!finalName || !user) return;
     if (!db || !auth) {
       setUserProfile((p) => {
-        const updatedProfile = { ...p, nickname: editedName };
+        const updatedProfile = { ...p, nickname: finalName };
         if (typeof window !== "undefined") {
           localStorage.setItem(
             localProfileStorageKey,
@@ -426,6 +448,7 @@ export default function LunchBuddyApp() {
         }
         return updatedProfile;
       });
+      setEditedName(finalName);
       setIsEditingName(false);
       return;
     }
@@ -440,9 +463,10 @@ export default function LunchBuddyApp() {
     );
     const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
     await Promise.all([
-      setDoc(profileRef, { nickname: editedName }, { merge: true }),
-      setDoc(userDocRef, { nickname: editedName }, { merge: true }),
+      setDoc(profileRef, { nickname: finalName }, { merge: true }),
+      setDoc(userDocRef, { nickname: finalName }, { merge: true }),
     ]);
+    setEditedName(finalName);
     setIsEditingName(false);
   };
 
