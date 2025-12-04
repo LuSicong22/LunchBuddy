@@ -75,8 +75,6 @@ if (firebaseConfig) {
   console.warn("Firebase 配置缺失，应用将以离线模式运行。");
 }
 
-const NICKNAME_MAX_LENGTH = 10;
-
 const appId =
   typeof __app_id !== "undefined"
     ? __app_id
@@ -177,7 +175,6 @@ export default function LunchBuddyApp() {
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
-  const [isComposingName, setIsComposingName] = useState(false);
 
   const [notification, setNotification] = useState(null);
 
@@ -359,34 +356,13 @@ export default function LunchBuddyApp() {
     }
   };
 
-  const normalizeNickname = (name) =>
-    (name || "").slice(0, NICKNAME_MAX_LENGTH);
-
-  const applyNicknameDraft = (setter) => (value) => {
-    const next = isComposingName ? value : normalizeNickname(value);
-    setter(next);
-  };
-
-  const startEditingNickname = () => {
-    setEditedName(normalizeNickname(userProfile?.nickname || ""));
-    setIsEditingName(true);
-    setIsComposingName(false);
-  };
-
-  const handleCancelEditNickname = () => {
-    setEditedName(normalizeNickname(userProfile?.nickname || ""));
-    setIsEditingName(false);
-    setIsComposingName(false);
-  };
-
   const handleRegistration = async (e) => {
     e.preventDefault();
-    const finalName = normalizeNickname(registrationName.trim());
-    if (!finalName || !user) return;
+    if (!registrationName.trim() || !user) return;
     setIsRegistering(true);
     if (!db || !auth) {
       const localProfile = {
-        nickname: finalName,
+        nickname: registrationName,
         createdAt: new Date().toISOString(),
         avatarColor: "bg-orange-500",
         shortId: generateShortId(),
@@ -398,7 +374,7 @@ export default function LunchBuddyApp() {
         );
       }
       setUserProfile(localProfile);
-      setEditedName(finalName);
+      setEditedName(localProfile.nickname);
       setIsRegistering(false);
       return;
     }
@@ -415,7 +391,7 @@ export default function LunchBuddyApp() {
     );
       const profileData = {
         uid: user.uid,
-        nickname: finalName,
+        nickname: registrationName,
         createdAt: new Date().toISOString(),
         avatarColor: `bg-${
           ["orange", "blue", "green", "purple"][Math.floor(Math.random() * 4)]
@@ -435,12 +411,10 @@ export default function LunchBuddyApp() {
   };
 
   const handleUpdateNickname = async () => {
-    const finalName = normalizeNickname(editedName.trim());
-    if (!finalName || !user) return;
-    setIsComposingName(false);
+    if (!editedName.trim() || !user) return;
     if (!db || !auth) {
       setUserProfile((p) => {
-        const updatedProfile = { ...p, nickname: finalName };
+        const updatedProfile = { ...p, nickname: editedName };
         if (typeof window !== "undefined") {
           localStorage.setItem(
             localProfileStorageKey,
@@ -449,7 +423,6 @@ export default function LunchBuddyApp() {
         }
         return updatedProfile;
       });
-      setEditedName(finalName);
       setIsEditingName(false);
       return;
     }
@@ -464,10 +437,9 @@ export default function LunchBuddyApp() {
     );
     const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
     await Promise.all([
-      setDoc(profileRef, { nickname: finalName }, { merge: true }),
-      setDoc(userDocRef, { nickname: finalName }, { merge: true }),
+      setDoc(profileRef, { nickname: editedName }, { merge: true }),
+      setDoc(userDocRef, { nickname: editedName }, { merge: true }),
     ]);
-    setEditedName(finalName);
     setIsEditingName(false);
   };
 
@@ -1394,36 +1366,10 @@ export default function LunchBuddyApp() {
                       <input
                         type="text"
                         value={editedName}
-                        onChange={(e) =>
-                          applyNicknameDraft(setEditedName)(e.target.value)
-                        }
-                        onCompositionStart={() => setIsComposingName(true)}
-                        onCompositionEnd={(e) => {
-                          setIsComposingName(false);
-                          applyNicknameDraft(setEditedName)(e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          if (isComposingName) return;
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleUpdateNickname();
-                          } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            handleCancelEditNickname();
-                          }
-                        }}
-                        inputMode="text"
-                        lang="zh-CN"
-                        autoComplete="nickname"
+                        onChange={(e) => setEditedName(e.target.value)}
                         className="bg-white/10 text-white text-lg font-bold rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-orange-500"
                         autoFocus
                       />
-                      <button
-                        onClick={handleCancelEditNickname}
-                        className="px-2 py-1 bg-white/10 text-white rounded hover:bg-white/20 text-sm font-bold"
-                      >
-                        取消
-                      </button>
                       <button
                         onClick={handleUpdateNickname}
                         className="p-1 bg-orange-500 rounded hover:bg-orange-600"
@@ -1437,7 +1383,7 @@ export default function LunchBuddyApp() {
                         {userProfile?.nickname}
                       </h2>
                       <button
-                        onClick={startEditingNickname}
+                        onClick={() => setIsEditingName(true)}
                         className="text-gray-400 hover:text-white transition-colors"
                       >
                         <Edit2 size={14} />
@@ -1709,30 +1655,18 @@ export default function LunchBuddyApp() {
             <input
               type="text"
               value={registrationName}
-              onChange={(e) =>
-                applyNicknameDraft(setRegistrationName)(e.target.value)
-              }
-              onCompositionStart={() => setIsComposingName(true)}
-              onCompositionEnd={(e) => {
-                setIsComposingName(false);
-                applyNicknameDraft(setRegistrationName)(e.target.value);
-              }}
-              lang="zh-CN"
-              inputMode="text"
-              autoComplete="nickname"
+              onChange={(e) => setRegistrationName(e.target.value)}
               placeholder="给自己起个响亮的名字"
               className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-4 text-lg focus:outline-none focus:border-orange-500 transition-colors"
               autoFocus
+              maxLength={10}
             />
             <div className="mt-3 flex flex-wrap gap-2">
               {RANDOM_NICKNAMES.map((name) => (
                 <button
                   type="button"
                   key={name}
-                  onClick={() => {
-                    setIsComposingName(false);
-                    setRegistrationName(normalizeNickname(name));
-                  }}
+                  onClick={() => setRegistrationName(name)}
                   className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-orange-100 hover:text-orange-600 transition-colors"
                 >
                   {name}
