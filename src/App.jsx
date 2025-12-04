@@ -45,6 +45,7 @@ import {
   deleteDoc,
   setDoc,
   updateDoc,
+  serverTimestamp,
   where,
 } from "firebase/firestore";
 import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES, USE_MOCK_DATA } from "./constants";
@@ -202,6 +203,12 @@ export default function LunchBuddyApp() {
   });
 
   const [diningViewMode, setDiningViewMode] = useState("me");
+
+  const [feedbackType, setFeedbackType] = useState("idea");
+  const [feedbackContent, setFeedbackContent] = useState("");
+  const [feedbackContact, setFeedbackContact] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -550,11 +557,16 @@ export default function LunchBuddyApp() {
 
         setIncomingInvites(invites);
         if (latestInvite && latestInvite.status === "accepted") {
+          setNotification(null);
           setConfirmedDining((prev) =>
             prev && prev.partner?.id === latestInvite.fromUid
               ? { ...prev, isAcknowledged: true }
               : prev
           );
+          setShowAllConfirmedModal(true);
+          allConfirmedShownRef.current = true;
+        } else if (latestInvite && latestInvite.status === "cancelled") {
+          handleRemoteCancellation();
         } else if (invites.length > invitePrevCountRef.current || latestInvite) {
           const latest = latestInvite || invites[invites.length - 1];
           if (latest && latest.status !== "accepted") {
@@ -662,17 +674,7 @@ export default function LunchBuddyApp() {
     if (!confirmedDining) return;
     const others = (confirmedDining.participants || []).filter((p) => !p.isSelf);
     if (others.length === 0) {
-      if (!soloExitNotifiedRef.current) {
-        showSystemNotification("饭局已解散", "其他人已退出，饭局自动结束");
-        soloExitNotifiedRef.current = true;
-      }
-      setConfirmedDining(null);
-      setMyStatus(previousStatus);
-      setPreviousStatus(null);
-      setActiveTab("home");
-      setDiningViewMode("me");
-      setFriendToDate(null);
-      setShowSoloExitModal(true);
+      handleRemoteCancellation();
     }
   }, [confirmedDining, previousStatus]);
 
@@ -806,6 +808,44 @@ export default function LunchBuddyApp() {
       setDoc(userDocRef, { nickname: editedName }, { merge: true }),
     ]);
     setIsEditingName(false);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackContent.trim()) {
+      showToast("请填写反馈内容", "说说哪里需要改进？", "error");
+      return;
+    }
+    if (!db) {
+      showToast("当前离线，无法提交反馈", "联网后再试试吧", "error");
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    try {
+      const feedbackRef = doc(
+        collection(db, "artifacts", appId, "feedback")
+      );
+      await setDoc(feedbackRef, {
+        type: feedbackType,
+        content: feedbackContent.trim(),
+        contact: feedbackContact.trim(),
+        createdAt: serverTimestamp(),
+        clientCreatedAt: new Date().toISOString(),
+        userUid: user?.uid || null,
+        userNickname: userProfile?.nickname || "",
+        userShortId: userProfile?.shortId || "",
+        appId,
+      });
+      showToast("已收到反馈", "感谢你的建议，产品汪在看啦", "success");
+      setFeedbackContent("");
+      setFeedbackContact("");
+      setFeedbackType("idea");
+      setShowFeedbackModal(false);
+    } catch (error) {
+      console.error("Submit feedback failed:", error);
+      showToast("提交失败，请稍后重试", "", "error");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const publishActiveStatus = async (plan) => {
@@ -1024,6 +1064,37 @@ export default function LunchBuddyApp() {
     }
   };
 
+  const notifyInviteCancelled = async (targetFriend) => {
+    if (!db || !user || !targetFriend?.id) return;
+    const now = new Date().toISOString();
+    const cancelRef = doc(
+      db,
+      "artifacts",
+      appId,
+      "users",
+      targetFriend.id,
+      "invites",
+      user.uid
+    );
+    try {
+      await setDoc(
+        cancelRef,
+        {
+          fromUid: user.uid,
+          fromNickname: userProfile?.nickname || "好友",
+          fromAvatarColor: userProfile?.avatarColor || "bg-orange-500",
+          lunchPlan: targetFriend.lunchPlan || lunchDetails,
+          status: "cancelled",
+          updatedAt: now,
+          createdAt: now,
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Notify cancel failed:", error);
+    }
+  };
+
   const handlePartnerAccept = async () => {
     if (!friendToDate) return;
     const finalPlan = friendToDate.lunchPlan || lunchDetails;
@@ -1059,6 +1130,7 @@ export default function LunchBuddyApp() {
       } 的饭局`,
     };
     soloExitNotifiedRef.current = false;
+    allConfirmedShownRef.current = false;
     setConfirmedDining(newDining);
     setPreviousStatus(myStatus);
     setMyStatus(null);
@@ -1094,6 +1166,21 @@ export default function LunchBuddyApp() {
       console.error("Show notification failed", error);
     }
   };
+
+  const handleRemoteCancellation = () => {
+    if (!confirmedDining) return;
+    if (!soloExitNotifiedRef.current) {
+      showSystemNotification("饭局已解散", "其他人已退出，饭局自动结束");
+      soloExitNotifiedRef.current = true;
+    }
+    setConfirmedDining(null);
+    setMyStatus(previousStatus);
+    setPreviousStatus(null);
+    setActiveTab("home");
+    setDiningViewMode("me");
+    setFriendToDate(null);
+    setShowSoloExitModal(true);
+  };
   const handleSoloExitAcknowledge = () => {
     setShowSoloExitModal(false);
     setActiveTab("home");
@@ -1117,12 +1204,14 @@ export default function LunchBuddyApp() {
 
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) return;
-    if (confirmedDining?.partner)
+    if (confirmedDining?.partner) {
       setFriends((prev) =>
         prev.map((f) =>
           f.id === confirmedDining.partner.id ? { ...f, status: "active" } : f
         )
       );
+      notifyInviteCancelled(confirmedDining.partner);
+    }
     if (confirmedDining?.id) resetOpenDiningEvent(confirmedDining.id);
     setConfirmedDining(null);
     setMyStatus(previousStatus);
@@ -1849,7 +1938,16 @@ export default function LunchBuddyApp() {
     return (
       <div className="flex flex-col h-full bg-gray-50">
         <div className="bg-white px-6 pt-10 pb-4 shadow-sm z-10">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">我和朋友</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">我和朋友</h1>
+            <button
+              onClick={() => setShowFeedbackModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100 shadow-sm active:scale-95"
+            >
+              <MessageSquare size={14} />
+              反馈
+            </button>
+          </div>
 
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 text-white shadow-lg mb-2">
             <div className="flex items-center gap-4">
@@ -2125,6 +2223,79 @@ export default function LunchBuddyApp() {
               >
                 关闭
               </button>
+            </div>
+          </div>
+        )}
+
+        {showFeedbackModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowFeedbackModal(false)}
+            ></div>
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 animate-bounce-in space-y-4 shadow-2xl">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={18} className="text-orange-500" />
+                    <h3 className="text-lg font-bold text-gray-800">建议 / 问题反馈</h3>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    有想法、Bug 或体验问题都可以直接告诉我们。
+                  </p>
+                </div>
+                <span className="text-[11px] text-orange-600 bg-orange-50 px-2 py-1 rounded-full font-semibold">
+                  实时写入后台
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: "idea", label: "产品建议" },
+                  { key: "bug", label: "问题 / Bug" },
+                  { key: "other", label: "其他" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setFeedbackType(item.key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors active:scale-95 ${
+                      feedbackType === item.key
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-orange-200"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={feedbackContent}
+                onChange={(e) => setFeedbackContent(e.target.value)}
+                placeholder="写下你的建议、遇到的问题或想要的功能..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 h-24 resize-none"
+              />
+
+              <input
+                type="text"
+                value={feedbackContact}
+                onChange={(e) => setFeedbackContact(e.target.value)}
+                placeholder="留下微信 / 邮箱（可选），便于跟进"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
+              />
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] text-gray-400">
+                  提交时会附带你的昵称和 ID，方便我们跟进。
+                </div>
+                <button
+                  onClick={handleSubmitFeedback}
+                  disabled={!feedbackContent.trim() || isSubmittingFeedback}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingFeedback ? "提交中..." : "提交反馈"}
+                </button>
+              </div>
             </div>
           </div>
         )}
