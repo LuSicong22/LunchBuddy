@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { INITIAL_FRIENDS, USE_MOCK_DATA } from '../constants';
 
-export function useFriends({ db, user, appId, userProfile }) {
+export function useFriends({ db, user, appId, userProfile, showToast }) {
   const [friends, setFriends] = useState(USE_MOCK_DATA ? INITIAL_FRIENDS : []);
   const [friendRequests, setFriendRequests] = useState([]);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
@@ -158,11 +158,11 @@ export function useFriends({ db, user, appId, userProfile }) {
 
   const handleAddFriend = useCallback(async () => {
     if (!newFriendId.trim() || newFriendId.length !== 6) {
-      alert('请输入6位数字ID');
+      showToast?.('请检查 ID', '请输入6位数字ID', 'error');
       return;
     }
     if (!db || !user) {
-      alert('当前离线模式，无法添加好友');
+      showToast?.('当前离线模式，无法添加好友', '', 'error');
       return;
     }
     try {
@@ -171,7 +171,7 @@ export function useFriends({ db, user, appId, userProfile }) {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        alert('未找到该 ID 的用户，请确认对方已注册');
+        showToast?.('没有找到这个朋友', '请确认 TA 已注册并提供正确的 6 位 ID', 'error');
         return;
       }
 
@@ -179,13 +179,13 @@ export function useFriends({ db, user, appId, userProfile }) {
       const friendData = friendDoc.data();
 
       if (friendData.uid === user.uid) {
-        alert('不能添加自己为好友');
+        showToast?.('不能添加自己', '换个朋友试试吧', 'error');
         return;
       }
 
       const alreadyFriend = friends.some((f) => f.id === friendData.uid || f.shortId === friendData.shortId);
       if (alreadyFriend) {
-        alert('已在好友列表中');
+        showToast?.('已在好友列表中', '', 'info');
         return;
       }
 
@@ -198,14 +198,14 @@ export function useFriends({ db, user, appId, userProfile }) {
         createdAt: new Date().toISOString()
       });
 
-      alert(`已向 ${friendData.nickname} 发送好友请求`);
+      showToast?.('好友请求已发送', `已向 ${friendData.nickname} 发送好友请求`, 'success');
       setNewFriendId('');
       setShowAddFriendModal(false);
     } catch (error) {
       console.error('Add friend error:', error);
-      alert('添加失败，请重试');
+      showToast?.('添加失败，请重试', '', 'error');
     }
-  }, [appId, db, friends, newFriendId, user, userProfile]);
+  }, [appId, db, friends, newFriendId, showToast, user, userProfile]);
 
   const initiateDeleteFriend = useCallback((friend) => setFriendToDelete(friend), []);
   const confirmDeleteFriend = useCallback(async () => {

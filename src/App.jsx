@@ -1,5 +1,5 @@
 /* global __firebase_config, __app_id, __initial_auth_token */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Utensils,
   Users,
@@ -50,6 +50,7 @@ import { INITIAL_OPEN_EVENTS, RANDOM_NICKNAMES, USE_MOCK_DATA } from "./constant
 import { NotificationOverlay } from "./components/NotificationOverlay";
 import { Navigation } from "./components/Navigation";
 import { StatusConfigModal } from "./components/modals/StatusConfigModal";
+import { Toast } from "./components/Toast";
 import { useFriends } from "./hooks/useFriends";
 import { copyToClipboard } from "./utils/clipboard";
 import { generateShortId } from "./utils/id";
@@ -80,6 +81,7 @@ const appId =
     ? __app_id
     : import.meta.env.VITE_APP_ID || "default-app-id";
 const localProfileStorageKey = `lunchbuddy_local_profile_${appId}`;
+const notificationPromptDismissedKey = `lunchbuddy_notification_prompt_dismissed_${appId}`;
 
 const MealIcon = ({ className = "" }) => (
   <svg
@@ -126,6 +128,17 @@ export default function LunchBuddyApp() {
   const [activeTab, setActiveTab] = useState("home");
   const [myStatus, setMyStatus] = useState(null);
   const [previousStatus, setPreviousStatus] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((title, message = "", type = "info") => {
+    setToast({ title, message, type });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2800);
+  }, []);
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  }, []);
   const {
     friends,
     setFriends,
@@ -136,22 +149,22 @@ export default function LunchBuddyApp() {
     newFriendId,
     setNewFriendId,
     friendToDelete,
-  setFriendToDelete,
-  showNoteModal,
-  setShowNoteModal,
-  currentNoteFriend,
-  setCurrentNoteFriend,
-  noteInput,
-  setNoteInput,
-  showFriendRequestModal,
-  setShowFriendRequestModal,
-  acceptFriendRequest,
-  handleAddFriend,
-  initiateDeleteFriend,
-  confirmDeleteFriend,
-  openNoteModal,
-  handleSaveNote,
-  } = useFriends({ db, user, appId, userProfile });
+    setFriendToDelete,
+    showNoteModal,
+    setShowNoteModal,
+    currentNoteFriend,
+    setCurrentNoteFriend,
+    noteInput,
+    setNoteInput,
+    showFriendRequestModal,
+    setShowFriendRequestModal,
+    acceptFriendRequest,
+    handleAddFriend,
+    initiateDeleteFriend,
+    confirmDeleteFriend,
+    openNoteModal,
+    handleSaveNote,
+  } = useFriends({ db, user, appId, userProfile, showToast });
 
   const [confirmedDining, setConfirmedDining] = useState(null);
   const [friendToDate, setFriendToDate] = useState(null);
@@ -176,6 +189,11 @@ export default function LunchBuddyApp() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const friendRequestPrevCountRef = useRef(0);
+  const [notificationPermission, setNotificationPermission] = useState(
+    typeof Notification !== "undefined" ? Notification.permission : "default"
+  );
+  const [showNotificationPermissionPrompt, setShowNotificationPermissionPrompt] =
+    useState(false);
 
   const [notification, setNotification] = useState(null);
 
@@ -189,6 +207,11 @@ export default function LunchBuddyApp() {
   const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   const installPromptDismissedKey = `lunchbuddy_install_prompt_dismissed_${appId}`;
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const hasDismissedInstallPrompt = () =>
     typeof window !== "undefined" &&
@@ -238,6 +261,28 @@ export default function LunchBuddyApp() {
       else mediaQuery.removeListener(updateDisplayMode);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      setShowNotificationPermissionPrompt(false);
+      return;
+    }
+    const permission = Notification.permission;
+    setNotificationPermission(permission);
+    const dismissed =
+      localStorage.getItem(notificationPromptDismissedKey) === "1";
+    if (
+      isStandalone &&
+      permission === "default" &&
+      !dismissed
+    ) {
+      setShowNotificationPermissionPrompt(true);
+    } else {
+      setShowNotificationPermissionPrompt(false);
+    }
+  }, [isStandalone, notificationPermission]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -372,6 +417,36 @@ export default function LunchBuddyApp() {
     friendRequestPrevCountRef.current = friendRequests.length;
   }, [friendRequests]);
 
+  const handleDismissNotificationPrompt = () => {
+    setShowNotificationPermissionPrompt(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(notificationPromptDismissedKey, "1");
+    }
+  };
+
+  const handleRequestNotificationPermission = async () => {
+    if (typeof Notification === "undefined") {
+      showToast("当前设备不支持系统推送", "", "error");
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      setNotificationPermission(result);
+      setShowNotificationPermissionPrompt(false);
+      if (result === "granted") {
+        showToast("已开启系统通知", "锁屏与顶部可收到提醒", "success");
+      } else if (result === "denied") {
+        showToast("通知权限被拒绝", "可在系统设置中开启通知", "warning");
+        if (typeof window !== "undefined") {
+          localStorage.setItem(notificationPromptDismissedKey, "1");
+        }
+      }
+    } catch (error) {
+      console.error("Notification permission request failed", error);
+      showToast("请求通知权限失败", "请稍后再试或在系统设置中开启", "error");
+    }
+  };
+
   const handleRegistration = async (e) => {
     e.preventDefault();
     if (!registrationName.trim() || !user) return;
@@ -421,7 +496,7 @@ export default function LunchBuddyApp() {
       await setDoc(userDocRef, profileData);
     } catch (error) {
       console.error("Registration failed:", error);
-      alert("注册失败");
+      showToast("注册失败", "请稍后再试", "error");
       setIsRegistering(false);
     }
   };
@@ -627,7 +702,7 @@ export default function LunchBuddyApp() {
 
   const handlePartnerAcknowledge = () => {
     setConfirmedDining((prev) => ({ ...prev, isAcknowledged: true }));
-    alert("已确认收到！(状态已更新)");
+    showToast("已确认收到", "状态已更新", "success");
     setDiningViewMode("me");
   };
   const handleInitiateCancel = () => {
@@ -1425,7 +1500,11 @@ export default function LunchBuddyApp() {
 
                 <div
                   className="flex items-center gap-2 bg-white/10 rounded-lg px-2 py-1.5 w-fit cursor-pointer hover:bg-white/20 transition-colors active:scale-95"
-                  onClick={() => copyToClipboard(userProfile?.shortId)}
+                  onClick={() =>
+                    copyToClipboard(userProfile?.shortId, () =>
+                      showToast("已复制ID", "", "success")
+                    )
+                  }
                 >
                   <span className="text-xs text-gray-300 font-mono">
                     ID: {userProfile?.shortId}
@@ -1736,6 +1815,35 @@ export default function LunchBuddyApp() {
           onTabChange={setActiveTab}
           friendRequestCount={friendRequests.length}
         />
+        {showNotificationPermissionPrompt && (
+          <div className="fixed top-4 left-4 right-4 z-40 animate-slide-down">
+            <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 px-4 py-3 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-orange-400">
+                <BellRing size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-bold">开启系统通知</div>
+                <div className="text-xs text-gray-200 mt-1 leading-relaxed">
+                  添加到主屏幕后，请授权通知，这样锁屏和顶部才能收到好友请求提醒。
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={handleRequestNotificationPermission}
+                  className="text-xs bg-orange-500 text-white px-3 py-1 rounded-lg font-bold hover:bg-orange-600 active:scale-95"
+                >
+                  允许通知
+                </button>
+                <button
+                  onClick={handleDismissNotificationPrompt}
+                  className="text-[11px] text-gray-400 hover:text-white"
+                >
+                  稍后
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {showInstallPrompt && !isStandalone && (
           <div className="fixed top-4 left-4 right-4 z-40 animate-slide-down">
             <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 px-4 py-3 flex items-start gap-3">
@@ -1770,6 +1878,7 @@ export default function LunchBuddyApp() {
           notification={notification}
           onClick={handleNotificationClick}
         />
+        <Toast toast={toast} onClose={dismissToast} />
 
         {friendToDate &&
           !["partner", "received_invite"].includes(datingStep) && (
