@@ -122,7 +122,7 @@ export default function LunchBuddyApp() {
   const [showStatusConfig, setShowStatusConfig] = useState(false);
 
   const [lunchDetails, setLunchDetails] = useState({
-    food: "",
+    food: "随意",
     size: "随意",
     time: "随意",
     location: "随意",
@@ -413,7 +413,7 @@ export default function LunchBuddyApp() {
 
   const handleCustomStart = () => {
     setLunchDetails({
-      food: "",
+      food: "随意",
       size: "随意",
       time: "随意",
       location: "随意",
@@ -565,16 +565,31 @@ export default function LunchBuddyApp() {
     setCancelReason("");
   };
 
+  const hasMeaningfulOverlap = (a, b, minLen = 2) => {
+    const clean = (str) => (str || "").toString().trim().replace(/\s+/g, "");
+    const s1 = clean(a);
+    const s2 = clean(b);
+    if (!s1 || !s2) return true;
+    if (s1 === "随意" || s2 === "随意") return true;
+    if (s1.includes(s2) || s2.includes(s1)) return true;
+    const [shorter, longer] =
+      s1.length <= s2.length ? [s1, s2] : [s2, s1];
+    if (shorter.length < minLen) return false;
+    for (let len = minLen; len <= shorter.length; len++) {
+      for (let i = 0; i <= shorter.length - len; i++) {
+        const sub = shorter.slice(i, i + len);
+        if (longer.includes(sub)) return true;
+      }
+    }
+    return false;
+  };
+
   const checkIsMatch = (my, fr) => {
     if (!fr) return false;
-    const chk = (a, b) =>
-      !a || !b || a === "随意" || b === "随意" || a === ""
-        ? true
-        : a.includes(b) || b.includes(a);
     return (
-      chk(my.food, fr.food) &&
-      chk(my.time, fr.time) &&
-      chk(my.location, fr.location)
+      hasMeaningfulOverlap(my.food, fr.food) &&
+      hasMeaningfulOverlap(my.time, fr.time) &&
+      hasMeaningfulOverlap(my.location, fr.location)
     );
   };
 
@@ -780,7 +795,7 @@ export default function LunchBuddyApp() {
         <div className="flex items-center ml-2">
           <button
             onClick={() => initiateDateFriend(friend)}
-            className="flex items-center justify-center px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black transition-colors shadow-md text-sm font-bold gap-1 active:scale-95"
+            className="flex items-center justify-center px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md text-sm font-bold gap-1 active:scale-95"
           >
             <HandPlatter size={16} /> 约一下
           </button>
@@ -1045,9 +1060,28 @@ export default function LunchBuddyApp() {
     return (
       <div className="flex flex-col h-full bg-gray-50">
         <div className="bg-white px-6 pt-10 pb-6 rounded-b-3xl shadow-sm z-10 transition-all duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-sm">
+                <Utensils size={20} />
+              </div>
+              <div className="text-lg font-bold text-gray-900">饭搭子</div>
+            </div>
+            <button
+              onClick={() => setActiveTab("friends")}
+              className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 active:scale-95 transition-transform"
+            >
+              <div
+                className={`w-9 h-9 rounded-full ${userProfile?.avatarColor || "bg-orange-500"} text-white flex items-center justify-center font-bold`}
+              >
+                {(userProfile?.nickname || "我")[0]}
+              </div>
+              <span className="font-bold text-gray-800 truncate max-w-[100px] text-left">
+                {userProfile?.nickname || "我"}
+              </span>
+            </button>
+          </div>
           <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            中午好，
-            <br />
             今天想和朋友吃饭吗？
           </h1>
           {myStatus === "active" ? (
@@ -1295,9 +1329,10 @@ export default function LunchBuddyApp() {
           </h2>
           <button
             onClick={() => setShowAddFriendModal(true)}
-            className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors active:scale-95"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold shadow-md hover:bg-orange-600 transition-colors active:scale-95"
           >
-            <Plus size={20} />
+            <Plus size={16} />
+            <span>添加好友</span>
           </button>
         </div>
 
@@ -1354,8 +1389,8 @@ export default function LunchBuddyApp() {
                 type="text"
                 value={newFriendId}
                 onChange={(e) => setNewFriendId(e.target.value)}
-                placeholder="输入朋友账号 (ID)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                placeholder="输入朋友账号 (ID)，例如 123456"
+                className="w-full bg-gray-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-200"
                 autoFocus
               />
               <div className="flex gap-3">

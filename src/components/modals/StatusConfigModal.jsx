@@ -11,7 +11,15 @@ export function StatusConfigModal({
 }) {
   if (!isOpen) return null;
 
+  const foodPresets = ['随意', '淮南牛肉汤', '麻辣香锅', '菜饭', '私聊'];
+  const locationPresets = ['随意', '老巴刹', '私聊'];
+
   const setLunchDetails = (details) => onUpdate(details);
+  const clearIfDefault = (field) => {
+    if (lunchDetails[field] === '随意') {
+      setLunchDetails({ ...lunchDetails, [field]: '' });
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -20,10 +28,7 @@ export function StatusConfigModal({
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
             <Target size={22} className="text-orange-500" />
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 leading-tight">精准组局</h2>
-              <p className="text-xs text-gray-500">简单填写，朋友一眼看懂</p>
-            </div>
+            <h2 className="text-lg font-bold text-gray-900 leading-tight">精准组局</h2>
           </div>
           <button
             onClick={onClose}
@@ -42,20 +47,51 @@ export function StatusConfigModal({
               </div>
               <button
                 onClick={() => onTogglePrivacy('hideFood')}
-                className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
-                  lunchDetails.hideFood ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-transparent text-gray-400 hover:border-gray-200'
+                className={`text-xs px-2 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
+                  lunchDetails.hideFood
+                    ? 'border-orange-200 bg-orange-50 text-orange-600'
+                    : 'border-transparent text-gray-400 hover:border-gray-200'
                 }`}
               >
-                {lunchDetails.hideFood ? '仅自己可见' : '朋友可见'}
+                {lunchDetails.hideFood ? (
+                  <>
+                    <EyeOff size={14} />
+                    <span>仅自己</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={14} />
+                    <span>公开</span>
+                  </>
+                )}
               </button>
             </label>
             <input
               type="text"
               value={lunchDetails.food}
               onChange={(e) => setLunchDetails({ ...lunchDetails, food: e.target.value })}
-              placeholder="随意 / 想吃的菜名"
+              placeholder="想吃的菜名"
+              onFocus={() => clearIfDefault('food')}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
             />
+            <div className="flex flex-wrap gap-2">
+              {foodPresets.map((item) => {
+                const active = lunchDetails.food === item;
+                return (
+                  <button
+                    key={item}
+                    onClick={() => setLunchDetails({ ...lunchDetails, food: item })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
+                      active
+                        ? 'bg-orange-500 text-white border-orange-500'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -72,6 +108,7 @@ export function StatusConfigModal({
                 <option value="2人">2人</option>
                 <option value="3-4人">3-4人</option>
                 <option value="多人聚餐">多人聚餐</option>
+                <option value="私聊">私聊</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -84,6 +121,7 @@ export function StatusConfigModal({
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-200 appearance-none"
               >
                 <option value="随意">随意</option>
+                <option value="私聊">私聊</option>
                 <option value="11:30">11:30</option>
                 <option value="12:00">12:00</option>
                 <option value="12:30">12:30</option>
@@ -99,22 +137,51 @@ export function StatusConfigModal({
               </div>
               <button
                 onClick={() => onTogglePrivacy('hideLocation')}
-                className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
+                className={`text-xs px-2 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
                   lunchDetails.hideLocation
                     ? 'border-purple-200 bg-purple-50 text-purple-600'
                     : 'border-transparent text-gray-400 hover:border-gray-200'
                 }`}
               >
-                {lunchDetails.hideLocation ? '仅自己可见' : '朋友可见'}
+                {lunchDetails.hideLocation ? (
+                  <>
+                    <EyeOff size={14} />
+                    <span>仅自己</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={14} />
+                    <span>公开</span>
+                  </>
+                )}
               </button>
             </label>
             <input
               type="text"
               value={lunchDetails.location}
               onChange={(e) => setLunchDetails({ ...lunchDetails, location: e.target.value })}
-              placeholder="随意 / 想去的地点"
+              placeholder="想去的地点"
+              onFocus={() => clearIfDefault('location')}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
             />
+            <div className="flex flex-wrap gap-2">
+              {locationPresets.map((item) => {
+                const active = lunchDetails.location === item;
+                return (
+                  <button
+                    key={item}
+                    onClick={() => setLunchDetails({ ...lunchDetails, location: item })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border active:scale-95 transition-colors ${
+                      active
+                        ? 'bg-purple-500 text-white border-purple-500'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
