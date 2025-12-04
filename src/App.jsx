@@ -534,12 +534,10 @@ export default function LunchBuddyApp() {
               lunchPlan: latest.lunchPlan,
               inviteId: latest.id,
             };
-            triggerNotification(
-              "收到约饭邀请",
-              `${friendPayload.nickname} 想加入你的饭局`,
-              "incoming_invite",
-              { friend: friendPayload }
-            );
+            setActiveTab("home");
+            setDiningViewMode("me");
+            setFriendToDate(friendPayload);
+            setDatingStep("received_invite");
           }
         }
         invitePrevCountRef.current = invites.length;
