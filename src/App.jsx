@@ -141,17 +141,17 @@ export default function LunchBuddyApp() {
   setShowNoteModal,
   currentNoteFriend,
   setCurrentNoteFriend,
-    noteInput,
-    setNoteInput,
-    showFriendRequestModal,
-    setShowFriendRequestModal,
+  noteInput,
+  setNoteInput,
+  showFriendRequestModal,
+  setShowFriendRequestModal,
   acceptFriendRequest,
   handleAddFriend,
   initiateDeleteFriend,
   confirmDeleteFriend,
   openNoteModal,
   handleSaveNote,
-  } = useFriends({ db, user, appId });
+  } = useFriends({ db, user, appId, userProfile });
 
   const [confirmedDining, setConfirmedDining] = useState(null);
   const [friendToDate, setFriendToDate] = useState(null);

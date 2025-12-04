@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { INITIAL_FRIENDS, USE_MOCK_DATA } from '../constants';
 
-export function useFriends({ db, user, appId }) {
+export function useFriends({ db, user, appId, userProfile }) {
   const [friends, setFriends] = useState(USE_MOCK_DATA ? INITIAL_FRIENDS : []);
   const [friendRequests, setFriendRequests] = useState([]);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
@@ -82,14 +82,73 @@ export function useFriends({ db, user, appId }) {
     };
   }, [db, user, appId]);
 
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+    if (!db || !user) {
+      setFriendRequests([]);
+      return;
+    }
+    const requestsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'friendRequests');
+    const unsubscribe = onSnapshot(
+      requestsRef,
+      (snapshot) => {
+        const requests = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          const fromUid = data.fromUid || data.uid || docSnap.id;
+          const fromNickname = data.fromNickname || data.nickname || '好友';
+          const fromShortId = data.fromShortId || data.shortId || '';
+          const fromAvatarColor = data.fromAvatarColor || data.avatarColor || 'bg-orange-500';
+          return {
+            id: docSnap.id,
+            ...data,
+            fromUid,
+            fromNickname,
+            fromShortId,
+            fromAvatarColor,
+            nickname: fromNickname,
+            shortId: fromShortId,
+            avatarColor: fromAvatarColor
+          };
+        });
+        setFriendRequests(requests);
+      },
+      (error) => console.error('Friend requests listen error:', error)
+    );
+    return () => unsubscribe();
+  }, [appId, db, user]);
+
   const acceptFriendRequest = useCallback(
-    (request) => {
-      const newFriend = { ...request, status: 'active', lunchPlan: null };
+    async (request) => {
+      const newFriend = {
+        id: request.fromUid,
+        nickname: request.fromNickname,
+        shortId: request.fromShortId,
+        avatarColor: request.fromAvatarColor,
+        status: 'active',
+        lunchPlan: null,
+        note: ''
+      };
       setFriends((prev) => [...prev, newFriend]);
       setFriendRequests((prev) => prev.filter((r) => r.id !== request.id));
       if (friendRequests.length <= 1) setShowFriendRequestModal(false);
+
+      if (db && user) {
+        try {
+          const now = new Date().toISOString();
+          const myFriendRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friends', request.fromUid);
+          const otherFriendRef = doc(db, 'artifacts', appId, 'users', request.fromUid, 'friends', user.uid);
+          const requestRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friendRequests', request.id);
+          await Promise.all([
+            setDoc(myFriendRef, { uid: request.fromUid, addedAt: now, note: '' }, { merge: true }),
+            setDoc(otherFriendRef, { uid: user.uid, addedAt: now, note: '' }, { merge: true }),
+            deleteDoc(requestRef)
+          ]);
+        } catch (error) {
+          console.error('Accept friend request error:', error);
+        }
+      }
     },
-    [friendRequests.length]
+    [appId, db, friendRequests.length, user]
   );
 
   const handleAddFriend = useCallback(async () => {
@@ -119,21 +178,29 @@ export function useFriends({ db, user, appId }) {
         return;
       }
 
-      const myFriendRef = doc(db, 'artifacts', appId, 'users', user.uid, 'friends', friendData.uid);
-      await setDoc(myFriendRef, {
-        uid: friendData.uid,
-        addedAt: new Date().toISOString(),
-        note: ''
+      const alreadyFriend = friends.some((f) => f.id === friendData.uid || f.shortId === friendData.shortId);
+      if (alreadyFriend) {
+        alert('已在好友列表中');
+        return;
+      }
+
+      const requestRef = doc(db, 'artifacts', appId, 'users', friendData.uid, 'friendRequests', user.uid);
+      await setDoc(requestRef, {
+        fromUid: user.uid,
+        fromNickname: userProfile?.nickname || '好友',
+        fromShortId: userProfile?.shortId || '',
+        fromAvatarColor: userProfile?.avatarColor || 'bg-orange-500',
+        createdAt: new Date().toISOString()
       });
 
-      alert(`成功添加 ${friendData.nickname}！`);
+      alert(`已向 ${friendData.nickname} 发送好友请求`);
       setNewFriendId('');
       setShowAddFriendModal(false);
     } catch (error) {
       console.error('Add friend error:', error);
       alert('添加失败，请重试');
     }
-  }, [appId, db, newFriendId, user]);
+  }, [appId, db, friends, newFriendId, user, userProfile]);
 
   const initiateDeleteFriend = useCallback((friend) => setFriendToDelete(friend), []);
   const confirmDeleteFriend = useCallback(async () => {
