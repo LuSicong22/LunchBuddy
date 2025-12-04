@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   collection,
   deleteDoc,
@@ -22,6 +22,7 @@ export function useFriends({ db, user, appId, userProfile }) {
   const [currentNoteFriend, setCurrentNoteFriend] = useState(null);
   const [noteInput, setNoteInput] = useState('');
   const [showFriendRequestModal, setShowFriendRequestModal] = useState(false);
+  const previousRequestCountRef = useRef(0);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -111,6 +112,10 @@ export function useFriends({ db, user, appId, userProfile }) {
           };
         });
         setFriendRequests(requests);
+        if (requests.length > previousRequestCountRef.current) {
+          setShowFriendRequestModal(true);
+        }
+        previousRequestCountRef.current = requests.length;
       },
       (error) => console.error('Friend requests listen error:', error)
     );
