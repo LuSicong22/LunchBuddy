@@ -1,5 +1,5 @@
 /* global __firebase_config, __app_id, __initial_auth_token */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Utensils,
   Users,
@@ -175,6 +175,7 @@ export default function LunchBuddyApp() {
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const friendRequestPrevCountRef = useRef(0);
 
   const [notification, setNotification] = useState(null);
 
@@ -355,6 +356,21 @@ export default function LunchBuddyApp() {
       setDatingStep("received_invite");
     }
   };
+
+  useEffect(() => {
+    if (friendRequests.length > friendRequestPrevCountRef.current) {
+      const latest =
+        friendRequests[friendRequests.length - 1] || friendRequests[0];
+      const name = latest?.fromNickname || latest?.nickname || "新朋友";
+      triggerNotification(
+        "收到好友请求",
+        `${name} 想加你为好友`,
+        "friend_request",
+        { requestId: latest?.id }
+      );
+    }
+    friendRequestPrevCountRef.current = friendRequests.length;
+  }, [friendRequests]);
 
   const handleRegistration = async (e) => {
     e.preventDefault();
@@ -1139,21 +1155,36 @@ export default function LunchBuddyApp() {
               </div>
               <div className="text-lg font-bold text-gray-900">饭搭子</div>
             </div>
-            <button
-              onClick={() => setActiveTab("friends")}
-              className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 active:scale-95 transition-transform"
-            >
-              <div
-                className={`w-9 h-9 rounded-full ${
-                  userProfile?.avatarColor || "bg-orange-500"
-                } text-white flex items-center justify-center font-bold`}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setActiveTab("friends");
+                  setShowFriendRequestModal(true);
+                }}
+                className="relative w-10 h-10 rounded-full bg-gray-100 text-gray-600 hover:text-gray-900 active:scale-95 transition-transform flex items-center justify-center shadow-sm border border-gray-200"
+                aria-label="好友请求"
               >
-                {(userProfile?.nickname || "我")[0]}
-              </div>
-              <span className="font-bold text-gray-800 truncate max-w-[100px] text-left">
-                {userProfile?.nickname || "我"}
-              </span>
-            </button>
+                <BellRing size={18} />
+                {friendRequests.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("friends")}
+                className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 active:scale-95 transition-transform"
+              >
+                <div
+                  className={`w-9 h-9 rounded-full ${
+                    userProfile?.avatarColor || "bg-orange-500"
+                  } text-white flex items-center justify-center font-bold`}
+                >
+                  {(userProfile?.nickname || "我")[0]}
+                </div>
+                <span className="font-bold text-gray-800 truncate max-w-[100px] text-left">
+                  {userProfile?.nickname || "我"}
+                </span>
+              </button>
+            </div>
           </div>
           <h1 className="text-2xl font-bold text-gray-800 mb-4">
             今天想和朋友吃饭吗？
