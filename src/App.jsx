@@ -209,6 +209,10 @@ export default function LunchBuddyApp() {
   const invitePrevCountRef = useRef(0);
   const inviteVersionRef = useRef({});
   const [, setIncomingInvites] = useState([]);
+  const [showSoloExitModal, setShowSoloExitModal] = useState(false);
+  const [showAllConfirmedModal, setShowAllConfirmedModal] = useState(false);
+  const allConfirmedShownRef = useRef(false);
+  const soloExitNotifiedRef = useRef(false);
   const [notificationPermission, setNotificationPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "default"
   );
@@ -240,6 +244,7 @@ export default function LunchBuddyApp() {
     try {
       const parsed = JSON.parse(stored);
       if (parsed?.confirmedDining) {
+        soloExitNotifiedRef.current = false;
         setConfirmedDining(parsed.confirmedDining);
         if (parsed.diningViewMode) setDiningViewMode(parsed.diningViewMode);
         setMyStatus(null);
@@ -653,6 +658,39 @@ export default function LunchBuddyApp() {
     }
   }, [confirmedDining, diningViewMode]);
 
+  useEffect(() => {
+    if (!confirmedDining) return;
+    const others = (confirmedDining.participants || []).filter((p) => !p.isSelf);
+    if (others.length === 0) {
+      if (!soloExitNotifiedRef.current) {
+        showSystemNotification("饭局已解散", "其他人已退出，饭局自动结束");
+        soloExitNotifiedRef.current = true;
+      }
+      setConfirmedDining(null);
+      setMyStatus(previousStatus);
+      setPreviousStatus(null);
+      setActiveTab("home");
+      setDiningViewMode("me");
+      setFriendToDate(null);
+      setShowSoloExitModal(true);
+    }
+  }, [confirmedDining, previousStatus]);
+
+  useEffect(() => {
+    if (
+      confirmedDining &&
+      confirmedDining.isAcknowledged &&
+      !confirmedDining.isReceiver
+    ) {
+      if (!allConfirmedShownRef.current) {
+        setShowAllConfirmedModal(true);
+        allConfirmedShownRef.current = true;
+      }
+    } else {
+      allConfirmedShownRef.current = false;
+    }
+  }, [confirmedDining]);
+
   const handleDismissNotificationPrompt = () => {
     setShowNotificationPermissionPrompt(false);
     if (typeof window !== "undefined") {
@@ -1020,6 +1058,7 @@ export default function LunchBuddyApp() {
         friendToDate.nickname
       } 的饭局`,
     };
+    soloExitNotifiedRef.current = false;
     setConfirmedDining(newDining);
     setPreviousStatus(myStatus);
     setMyStatus(null);
@@ -1037,6 +1076,27 @@ export default function LunchBuddyApp() {
     setConfirmedDining((prev) => ({ ...prev, isAcknowledged: true }));
     showToast("已确认收到", "状态已更新", "success");
     setDiningViewMode("me");
+  };
+  const handleAllConfirmedAcknowledge = () => setShowAllConfirmedModal(false);
+  const showSystemNotification = async (title, body) => {
+    if (typeof window === "undefined") return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission !== "granted") return;
+    try {
+      const registration = await navigator.serviceWorker?.ready;
+      await registration?.showNotification(title, {
+        body,
+        icon: "/icon-192.svg",
+        badge: "/icon-192.svg",
+        data: "/",
+      });
+    } catch (error) {
+      console.error("Show notification failed", error);
+    }
+  };
+  const handleSoloExitAcknowledge = () => {
+    setShowSoloExitModal(false);
+    setActiveTab("home");
   };
   const handleInitiateCancel = () => {
     setCancelReason("");
@@ -2381,6 +2441,48 @@ export default function LunchBuddyApp() {
                   确认取消
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {showSoloExitModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 animate-bounce-in text-center shadow-xl">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-orange-500 font-bold text-2xl">
+                !
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-gray-800">
+                饭局已解散
+              </h3>
+              <p className="text-gray-500 mb-6 text-sm">
+                其他人已退出，饭局自动结束。你的求约/状态保持不变。
+              </p>
+              <button
+                onClick={handleSoloExitAcknowledge}
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
+              >
+                好的
+              </button>
+            </div>
+          </div>
+        )}
+        {showAllConfirmedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative z-10 animate-bounce-in text-center shadow-xl">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 font-bold text-2xl">
+                ✓
+              </div>
+              <h3 className="text-xl font-bold mb-2 text-gray-800">所有人已确认</h3>
+              <p className="text-gray-500 mb-6 text-sm">
+                对方已接受邀请，饭局已双向确认。
+              </p>
+              <button
+                onClick={handleAllConfirmedAcknowledge}
+                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
+              >
+                知道了
+              </button>
             </div>
           </div>
         )}
