@@ -906,6 +906,10 @@ export default function LunchBuddyApp() {
         data: friend,
       })),
     ];
+    const handleOpenAddFriend = () => {
+      setActiveTab("friends");
+      setShowAddFriendModal(true);
+    };
 
     const renderActiveItem = (item) =>
       item.type === "event" ? (
@@ -1154,6 +1158,27 @@ export default function LunchBuddyApp() {
           <h1 className="text-2xl font-bold text-gray-800 mb-4">
             今天想和朋友吃饭吗？
           </h1>
+          {friends.length === 0 && (
+            <div className="mb-4 bg-white border-2 border-dashed border-orange-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm animate-slide-up">
+              <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+                <UserPlus size={22} />
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-800 text-sm">
+                  先添加一位朋友再开饭吧
+                </div>
+                <p className="text-xs text-gray-500">
+                  分享你的 ID 或输入朋友的 ID，才能互相看到饭局状态。
+                </p>
+              </div>
+              <button
+                onClick={handleOpenAddFriend}
+                className="px-3 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg shadow-md active:scale-95"
+              >
+                去添加
+              </button>
+            </div>
+          )}
           {myStatus === "active" ? (
             <div className="relative overflow-hidden rounded-2xl transition-all duration-300 border-2 bg-orange-50 border-orange-200 shadow-orange-100 shadow-lg p-4 animate-pulse-slow">
               <div className="flex items-center justify-between relative z-10">
@@ -1300,10 +1325,15 @@ export default function LunchBuddyApp() {
               <div className="space-y-4">
                 {activeItems.map((item) => renderActiveItem(item))}
                 {activeItems.length === 0 && (
-                  <div className="text-center py-10 text-gray-400 text-sm">
-                    哎呀，现在好像没有朋友在找吃的。
-                    <br />
-                    要不你主动吼一声？
+                  <div className="text-center py-10 text-gray-500 text-sm bg-white/60 rounded-2xl border border-dashed border-orange-100">
+                    <p className="mb-3">还没有找到饭搭子，先加几个朋友吧。</p>
+                    <button
+                      onClick={handleOpenAddFriend}
+                      className="inline-flex items-center gap-1 px-4 py-2 bg-orange-500 text-white rounded-full text-xs font-bold shadow-sm active:scale-95"
+                    >
+                      <UserPlus size={14} />
+                      添加朋友
+                    </button>
                   </div>
                 )}
               </div>
