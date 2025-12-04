@@ -941,7 +941,7 @@ export default function LunchBuddyApp() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      isAcknowledged: false,
+      isAcknowledged: datingStep === "received_invite",
       isGroup,
       participants: mappedParticipants,
       title: `${userProfile?.nickname || "我"} x ${
@@ -2077,27 +2077,28 @@ export default function LunchBuddyApp() {
           friendRequestCount={friendRequests.length}
         />
         {showNotificationPermissionPrompt && (
-          <div className="fixed top-4 left-4 right-4 z-40 animate-slide-down">
-            <div className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-gray-800 px-4 py-3 flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-orange-400">
+          <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="relative bg-gray-900 text-white rounded-3xl shadow-2xl border border-gray-800 px-5 py-5 flex items-start gap-4 w-full max-w-sm animate-bounce-in">
+              <div className="w-12 h-12 rounded-2xl bg-gray-800 flex items-center justify-center text-orange-400">
                 <BellRing size={20} />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold">开启系统通知</div>
-                <div className="text-xs text-gray-200 mt-1 leading-relaxed">
+                <div className="text-base font-bold">开启系统通知</div>
+                <div className="text-sm text-gray-200 mt-1 leading-relaxed">
                   添加到主屏幕后，请授权通知，这样锁屏和顶部才能收到好友请求提醒。
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-2 shrink-0">
                 <button
                   onClick={handleRequestNotificationPermission}
-                  className="text-xs bg-orange-500 text-white px-3 py-1 rounded-lg font-bold hover:bg-orange-600 active:scale-95"
+                  className="text-sm bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 active:scale-95 shadow-md"
                 >
                   允许通知
                 </button>
                 <button
                   onClick={handleDismissNotificationPrompt}
-                  className="text-[11px] text-gray-400 hover:text-white"
+                  className="text-xs text-gray-400 hover:text-white"
                 >
                   稍后
                 </button>
