@@ -192,6 +192,9 @@ export default function LunchBuddyApp() {
   const [cancelReason, setCancelReason] = useState("");
   const [showStatusConfig, setShowStatusConfig] = useState(false);
 
+  const [isComposingName, setIsComposingName] = useState(false);
+  const [isComposingNote, setIsComposingNote] = useState(false);
+
   const [lunchDetails, setLunchDetails] = useState({
     food: "随意",
     size: "随意",
@@ -846,6 +849,40 @@ export default function LunchBuddyApp() {
     } finally {
       setIsSubmittingFeedback(false);
     }
+  };
+
+  const handleNicknameChange = (e) => {
+    const { value, nativeEvent } = e;
+    setEditedName(value);
+    if (isComposingName && nativeEvent?.isComposing === false) {
+      setIsComposingName(false);
+    }
+  };
+
+  const handleNicknameCompositionStart = () => {
+    setIsComposingName(true);
+  };
+
+  const handleNicknameCompositionEnd = (e) => {
+    setIsComposingName(false);
+    setEditedName(e.target.value);
+  };
+
+  const handleNoteChange = (e) => {
+    const { value, nativeEvent } = e;
+    setNoteInput(value);
+    if (isComposingNote && nativeEvent?.isComposing === false) {
+      setIsComposingNote(false);
+    }
+  };
+
+  const handleNoteCompositionStart = () => {
+    setIsComposingNote(true);
+  };
+
+  const handleNoteCompositionEnd = (e) => {
+    setIsComposingNote(false);
+    setNoteInput(e.target.value);
   };
 
   const publishActiveStatus = async (plan) => {
@@ -1966,8 +2003,14 @@ export default function LunchBuddyApp() {
                         type="text"
                         inputMode="text"
                         lang="zh-CN"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
                         value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
+                        onChange={handleNicknameChange}
+                        onCompositionStart={handleNicknameCompositionStart}
+                        onCompositionEnd={handleNicknameCompositionEnd}
                         className="bg-white/10 text-white text-lg font-bold rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-orange-500"
                         autoFocus
                       />
@@ -2165,8 +2208,14 @@ export default function LunchBuddyApp() {
                 type="text"
                 inputMode="text"
                 lang="zh-CN"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
+                onChange={handleNoteChange}
+                onCompositionStart={handleNoteCompositionStart}
+                onCompositionEnd={handleNoteCompositionEnd}
                 placeholder="输入备注..."
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-200"
                 autoFocus
