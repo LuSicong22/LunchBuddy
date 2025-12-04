@@ -437,6 +437,7 @@ export default function LunchBuddyApp() {
   const handleUpdateNickname = async () => {
     const finalName = normalizeNickname(editedName.trim());
     if (!finalName || !user) return;
+    setIsComposingName(false);
     if (!db || !auth) {
       setUserProfile((p) => {
         const updatedProfile = { ...p, nickname: finalName };
@@ -1393,10 +1394,36 @@ export default function LunchBuddyApp() {
                       <input
                         type="text"
                         value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
+                        onChange={(e) =>
+                          applyNicknameDraft(setEditedName)(e.target.value)
+                        }
+                        onCompositionStart={() => setIsComposingName(true)}
+                        onCompositionEnd={(e) => {
+                          setIsComposingName(false);
+                          applyNicknameDraft(setEditedName)(e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (isComposingName) return;
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleUpdateNickname();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            handleCancelEditNickname();
+                          }
+                        }}
+                        inputMode="text"
+                        lang="zh-CN"
+                        autoComplete="nickname"
                         className="bg-white/10 text-white text-lg font-bold rounded px-2 py-0.5 w-full focus:outline-none focus:ring-1 focus:ring-orange-500"
                         autoFocus
                       />
+                      <button
+                        onClick={handleCancelEditNickname}
+                        className="px-2 py-1 bg-white/10 text-white rounded hover:bg-white/20 text-sm font-bold"
+                      >
+                        取消
+                      </button>
                       <button
                         onClick={handleUpdateNickname}
                         className="p-1 bg-orange-500 rounded hover:bg-orange-600"
@@ -1410,7 +1437,7 @@ export default function LunchBuddyApp() {
                         {userProfile?.nickname}
                       </h2>
                       <button
-                        onClick={() => setIsEditingName(true)}
+                        onClick={startEditingNickname}
                         className="text-gray-400 hover:text-white transition-colors"
                       >
                         <Edit2 size={14} />
@@ -1682,18 +1709,30 @@ export default function LunchBuddyApp() {
             <input
               type="text"
               value={registrationName}
-              onChange={(e) => setRegistrationName(e.target.value)}
+              onChange={(e) =>
+                applyNicknameDraft(setRegistrationName)(e.target.value)
+              }
+              onCompositionStart={() => setIsComposingName(true)}
+              onCompositionEnd={(e) => {
+                setIsComposingName(false);
+                applyNicknameDraft(setRegistrationName)(e.target.value);
+              }}
+              lang="zh-CN"
+              inputMode="text"
+              autoComplete="nickname"
               placeholder="给自己起个响亮的名字"
               className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-4 text-lg focus:outline-none focus:border-orange-500 transition-colors"
               autoFocus
-              maxLength={10}
             />
             <div className="mt-3 flex flex-wrap gap-2">
               {RANDOM_NICKNAMES.map((name) => (
                 <button
                   type="button"
                   key={name}
-                  onClick={() => setRegistrationName(name)}
+                  onClick={() => {
+                    setIsComposingName(false);
+                    setRegistrationName(normalizeNickname(name));
+                  }}
                   className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-orange-100 hover:text-orange-600 transition-colors"
                 >
                   {name}
