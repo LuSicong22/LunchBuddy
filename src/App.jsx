@@ -455,23 +455,7 @@ export default function LunchBuddyApp() {
     if (confirmedDining?.partner) setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
     if (confirmedDining?.id) resetOpenDiningEvent(confirmedDining.id);
     setConfirmedDining(null);
-    setShowCancelDiningModal(false);
-    setCancelReason('');
-  };
-
-  const handleExitDining = () => {
-    const confirmedId = confirmedDining?.id;
-    const isFromOpenEvent = Boolean(confirmedId);
-    if (!window.confirm('确定要退出当前饭局吗？')) return;
-
-    if (confirmedDining?.partner) {
-      setFriends((prev) => prev.map((f) => (f.id === confirmedDining.partner.id ? { ...f, status: 'active' } : f)));
-    }
-
-    if (isFromOpenEvent) resetOpenDiningEvent(confirmedId);
-
-    setConfirmedDining(null);
-    setDiningViewMode('me');
+    setMyStatus('active');
     setShowCancelDiningModal(false);
     setCancelReason('');
   };
@@ -772,24 +756,14 @@ export default function LunchBuddyApp() {
                 <div className="pt-3 border-t border-gray-100">
                   {confirmedDining.isGroup ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
-                        <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
-                      </div>
+                      <div className="text-xs text-gray-400 mb-3">生成时间: {confirmedDining.timestamp}</div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
                       </button>
                     </>
                   ) : diningViewMode === 'me' ? (
                     <>
-                      <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
-                        <span>生成时间: {confirmedDining.timestamp}</span>
-                        <button onClick={handleExitDining} className="text-red-400 hover:text-red-500 font-medium">
-                          退出饭局
-                        </button>
-                      </div>
+                      <div className="text-xs text-gray-400 mb-3">生成时间: {confirmedDining.timestamp}</div>
                       <button onClick={handleInitiateCancel} className="text-red-400 text-sm font-medium hover:text-red-500">
                         取消/结束饭局
                       </button>
@@ -949,7 +923,7 @@ export default function LunchBuddyApp() {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4 px-2">
-                <h2 className="font-bold text-gray-700">正在觅食的朋友 ({activeItems.length})</h2>
+                <h2 className="font-bold text-gray-700">开放中的饭局 ({activeItems.length})</h2>
                 <span className="text-xs text-orange-500 bg-orange-100 px-2 py-1 rounded-full">实时更新</span>
               </div>
               <div className="space-y-4">
