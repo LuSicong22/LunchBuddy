@@ -3,8 +3,8 @@
   "short_name": "LunchBuddy",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "description": "和朋友一起快速约饭的社交小工具",
   "icons": [
     {
