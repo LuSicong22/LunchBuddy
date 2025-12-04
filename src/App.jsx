@@ -42,6 +42,7 @@ import {
   getFirestore,
   onSnapshot,
   query,
+  deleteDoc,
   setDoc,
   updateDoc,
   where,
@@ -82,6 +83,11 @@ const appId =
     : import.meta.env.VITE_APP_ID || "default-app-id";
 const localProfileStorageKey = `lunchbuddy_local_profile_${appId}`;
 const notificationPromptDismissedKey = `lunchbuddy_notification_prompt_dismissed_${appId}`;
+const VAPID_PUBLIC_KEY =
+  (typeof __vapid_public_key !== "undefined" && __vapid_public_key) ||
+  import.meta.env.VITE_VAPID_PUBLIC_KEY ||
+  "";
+const notificationPromptDismissedKey = `lunchbuddy_notification_prompt_dismissed_${appId}`;
 
 const MealIcon = ({ className = "" }) => (
   <svg
@@ -117,6 +123,17 @@ const MealIcon = ({ className = "" }) => (
     />
   </svg>
 );
+
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
 
 export default function LunchBuddyApp() {
   const [user, setUser] = useState(null);
@@ -189,6 +206,8 @@ export default function LunchBuddyApp() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const friendRequestPrevCountRef = useRef(0);
+  const invitePrevCountRef = useRef(0);
+  const [, setIncomingInvites] = useState([]);
   const [notificationPermission, setNotificationPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "default"
   );
@@ -377,12 +396,12 @@ export default function LunchBuddyApp() {
     return () => unsubscribe();
   }, []);
 
-  const triggerNotification = (title, body, type, payload = {}) => {
+  const triggerNotification = useCallback((title, body, type, payload = {}) => {
     setNotification({ title, body, type, payload });
     setTimeout(() => {
       setNotification((prev) => (prev && prev.type === type ? null : prev));
     }, 5000);
-  };
+  }, []);
 
   const handleNotificationClick = () => {
     if (!notification) return;
@@ -402,6 +421,21 @@ export default function LunchBuddyApp() {
     }
   };
 
+  const handleNotificationAccept = () => {
+    if (
+      notification?.type === "incoming_invite" &&
+      notification?.payload?.friend
+    ) {
+      setNotification(null);
+      setActiveTab("home");
+      setDiningViewMode("me");
+      setFriendToDate(notification.payload.friend);
+      setDatingStep("received_invite");
+    } else {
+      handleNotificationClick();
+    }
+  };
+
   useEffect(() => {
     if (friendRequests.length > friendRequestPrevCountRef.current) {
       const latest =
@@ -416,6 +450,139 @@ export default function LunchBuddyApp() {
     }
     friendRequestPrevCountRef.current = friendRequests.length;
   }, [friendRequests]);
+
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+    if (!db || !user) {
+      setIncomingInvites([]);
+      invitePrevCountRef.current = 0;
+      return;
+    }
+
+    const invitesRef = collection(
+      db,
+      "artifacts",
+      appId,
+      "users",
+      user.uid,
+      "invites"
+    );
+    const unsubscribe = onSnapshot(
+      invitesRef,
+      (snapshot) => {
+        const invites = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          const lunchPlan =
+            data.lunchPlan ||
+            data.plan ||
+            (data.food || data.time || data.location || data.size
+              ? {
+                  food: data.food,
+                  time: data.time,
+                  location: data.location,
+                  size: data.size,
+                }
+              : null);
+          return {
+            id: docSnap.id,
+            ...data,
+            fromUid: data.fromUid || data.uid || docSnap.id,
+            fromNickname: data.fromNickname || data.nickname || "好友",
+            fromAvatarColor: data.fromAvatarColor || data.avatarColor || "bg-orange-500",
+            lunchPlan,
+          };
+        });
+        setIncomingInvites(invites);
+        if (invites.length > invitePrevCountRef.current) {
+          const latest = invites[invites.length - 1];
+          const friendPayload = {
+            id: latest.fromUid,
+            nickname: latest.fromNickname,
+            avatarColor: latest.fromAvatarColor,
+            lunchPlan: latest.lunchPlan,
+            inviteId: latest.id,
+          };
+          triggerNotification(
+            "收到约饭邀请",
+            `${friendPayload.nickname} 想加入你的饭局`,
+            "incoming_invite",
+            { friend: friendPayload }
+          );
+        }
+        invitePrevCountRef.current = invites.length;
+      },
+      (error) => console.error("Invites listen error:", error)
+    );
+
+    return () => unsubscribe();
+  }, [appId, db, triggerNotification, user]);
+
+  const ensurePushSubscription = useCallback(async () => {
+    if (
+      !user ||
+      !db ||
+      notificationPermission !== "granted" ||
+      !isStandalone
+    )
+      return;
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      showToast("设备不支持系统推送", "请更换支持的浏览器/设备", "warning");
+      return;
+    }
+    let registration = null;
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch (error) {
+      console.error("Service worker not ready", error);
+      showToast("推送初始化失败", "稍后再试或重新打开应用", "error");
+      return;
+    }
+    if (!registration.pushManager) {
+      showToast("推送不可用", "浏览器未开启 PushManager", "warning");
+      return;
+    }
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn("VAPID 公钥未配置，无法订阅推送");
+      showToast("缺少推送密钥", "请配置 VITE_VAPID_PUBLIC_KEY", "warning");
+      return;
+    }
+    try {
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      const payload = {
+        pushSubscription: subscription.toJSON(),
+        notificationPermission: "granted",
+      };
+      const profileRef = doc(
+        db,
+        "artifacts",
+        appId,
+        "users",
+        user.uid,
+        "data",
+        "profile"
+      );
+      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+      await Promise.all([
+        setDoc(profileRef, payload, { merge: true }),
+        setDoc(userDocRef, payload, { merge: true }),
+      ]);
+      showToast("推送已开启", "锁屏和顶部可收到好友请求", "success");
+    } catch (error) {
+      console.error("Subscribe push failed", error);
+      showToast("推送订阅失败", "请检查网络或稍后再试", "error");
+    }
+  }, [appId, db, isStandalone, notificationPermission, showToast, user]);
+
+  useEffect(() => {
+    ensurePushSubscription();
+  }, [ensurePushSubscription]);
 
   const handleDismissNotificationPrompt = () => {
     setShowNotificationPermissionPrompt(false);
@@ -666,14 +833,65 @@ export default function LunchBuddyApp() {
     setShowInstallPrompt(false);
   };
   const handleSendInvite = () => setDatingStep("partner");
-  const handlePartnerDecline = () => {
+  const handlePartnerDecline = async () => {
+    if (datingStep === "received_invite" && friendToDate) {
+      await clearInviteForCurrentUser(friendToDate);
+    }
     setFriendToDate(null);
     setDatingStep("confirm");
   };
 
-  const handlePartnerAccept = () => {
+  const sendInviteToFriend = async (targetFriend, plan) => {
+    if (!db || !user || !targetFriend?.id) return;
+    const inviteRef = doc(
+      db,
+      "artifacts",
+      appId,
+      "users",
+      targetFriend.id,
+      "invites",
+      user.uid
+    );
+    try {
+      await setDoc(inviteRef, {
+        fromUid: user.uid,
+        fromNickname: userProfile?.nickname || "好友",
+        fromAvatarColor: userProfile?.avatarColor || "bg-orange-500",
+        lunchPlan: plan,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Send invite failed:", error);
+    }
+  };
+
+  const clearInviteForCurrentUser = async (fromFriend) => {
+    if (!db || !user || !fromFriend?.id) return;
+    const inviteRef = doc(
+      db,
+      "artifacts",
+      appId,
+      "users",
+      user.uid,
+      "invites",
+      fromFriend.inviteId || fromFriend.id
+    );
+    try {
+      await deleteDoc(inviteRef);
+    } catch (error) {
+      console.error("Clear invite failed:", error);
+    }
+  };
+
+  const handlePartnerAccept = async () => {
     if (!friendToDate) return;
     const finalPlan = friendToDate.lunchPlan || lunchDetails;
+    if (datingStep === "confirm") {
+      await sendInviteToFriend(friendToDate, finalPlan);
+    }
+    if (datingStep === "received_invite") {
+      await clearInviteForCurrentUser(friendToDate);
+    }
     const participantEntries = [
       { friendId: null, role: "我", isSelf: true },
       { friendId: friendToDate.id, role: "朋友" },
@@ -1887,6 +2105,7 @@ export default function LunchBuddyApp() {
         <NotificationOverlay
           notification={notification}
           onClick={handleNotificationClick}
+          onAccept={handleNotificationAccept}
         />
         <Toast toast={toast} onClose={dismissToast} />
 

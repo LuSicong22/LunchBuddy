@@ -1,8 +1,10 @@
 import React from 'react';
 import { BellRing, Sparkles, UserPlus } from 'lucide-react';
 
-export function NotificationOverlay({ notification, onClick }) {
+export function NotificationOverlay({ notification, onClick, onAccept }) {
   if (!notification) return null;
+
+  const isInvite = notification.type === 'incoming_invite';
 
   return (
     <div
@@ -21,6 +23,20 @@ export function NotificationOverlay({ notification, onClick }) {
         </div>
         <span className="text-[10px] text-gray-400">刚刚</span>
       </div>
+      {isInvite && (
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAccept?.();
+            }}
+            className="px-3 py-1 bg-orange-500 text-white rounded-full text-xs font-bold shadow-sm active:scale-95"
+          >
+            接受
+          </button>
+          <span className="text-[10px] text-gray-400">或稍后再说</span>
+        </div>
+      )}
     </div>
   );
 }
