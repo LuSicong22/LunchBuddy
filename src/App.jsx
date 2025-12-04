@@ -534,8 +534,8 @@ export default function LunchBuddyApp() {
     setIsEditingName(false);
   };
 
-  const handleQuickStart = () => {
-    const defaultDetails = {
+  const publishActiveStatus = async (plan) => {
+    const finalPlan = {
       food: "随意",
       size: "随意",
       time: "随意",
@@ -543,11 +543,47 @@ export default function LunchBuddyApp() {
       hideFood: false,
       hideLocation: false,
       preferFriendsOnlyGroup: true,
+      ...plan,
     };
-    setLunchDetails(defaultDetails);
+
+    setLunchDetails(finalPlan);
     setPreviousStatus(null);
     setMyStatus("active");
+    setShowStatusConfig(false);
+
+    if (db && user) {
+      const profileRef = doc(
+        db,
+        "artifacts",
+        appId,
+        "users",
+        user.uid,
+        "data",
+        "profile"
+      );
+      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
+      const payload = { status: "active", lunchPlan: finalPlan };
+      try {
+        await Promise.all([
+          setDoc(profileRef, payload, { merge: true }),
+          setDoc(userDocRef, payload, { merge: true }),
+        ]);
+      } catch (error) {
+        console.error("Publish status failed:", error);
+      }
+    }
   };
+
+  const handleQuickStart = () =>
+    publishActiveStatus({
+      food: "随意",
+      size: "随意",
+      time: "随意",
+      location: "随意",
+      hideFood: false,
+      hideLocation: false,
+      preferFriendsOnlyGroup: true,
+    });
 
   const handleCustomStart = () => {
     setLunchDetails({
@@ -564,33 +600,7 @@ export default function LunchBuddyApp() {
   };
 
   const confirmPublishStatus = async () => {
-    setPreviousStatus(null);
-    setMyStatus("active");
-    setShowStatusConfig(false);
-    if (db && user) {
-      const profileRef = doc(
-        db,
-        "artifacts",
-        appId,
-        "users",
-        user.uid,
-        "data",
-        "profile"
-      );
-      const userDocRef = doc(db, "artifacts", appId, "users", user.uid);
-      const payload = {
-        status: "active",
-        lunchPlan: lunchDetails,
-      };
-      try {
-        await Promise.all([
-          setDoc(profileRef, payload, { merge: true }),
-          setDoc(userDocRef, payload, { merge: true }),
-        ]);
-      } catch (error) {
-        console.error("Publish status failed:", error);
-      }
-    }
+    await publishActiveStatus(lunchDetails);
   };
 
   const handleStopStatus = async () => {
