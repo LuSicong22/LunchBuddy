@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 /**
  * Simple web-push sender wired to Firestore.
  * Usage (after installing deps and setting env):
@@ -32,8 +34,12 @@ if (missing.length) {
 }
 
 const APP_ID = process.env.APP_ID || "default-app-id";
-const CONTACT_EMAIL =
+const contactRaw =
   process.env.ADMIN_SENDER_EMAIL || "mailto:lunchbuddy@example.com";
+const CONTACT_EMAIL =
+  contactRaw.startsWith("mailto:") || contactRaw.startsWith("http")
+    ? contactRaw
+    : `mailto:${contactRaw}`;
 
 // Fix escaped newlines in private key
 const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
@@ -71,6 +77,7 @@ if (!targetUid) {
 }
 
 async function getSubscription(uid) {
+  console.log(`Using APP_ID=${APP_ID}`);
   const userDocRef = db.doc(`artifacts/${APP_ID}/users/${uid}`);
   const profileDocRef = db.doc(
     `artifacts/${APP_ID}/users/${uid}/data/profile`
@@ -81,10 +88,42 @@ async function getSubscription(uid) {
   ]);
   const userData = userSnap.exists ? userSnap.data() : {};
   const profileData = profileSnap.exists ? profileSnap.data() : {};
-  return (
+  if (!userSnap.exists && !profileSnap.exists) {
+    console.warn(
+      `No docs under artifacts/${APP_ID}/users/${uid} (user/profile missing)`
+    );
+  }
+  if (userData.pushSubscription || profileData.pushSubscription) {
+    console.log("Found subscription in artifacts path");
+  }
+  const subscription =
     profileData.pushSubscription ||
     userData.pushSubscription ||
     profileData.subscription ||
+    null;
+
+  if (subscription) return subscription;
+
+  // Fallback: try root-level users/{uid} (in case appId mismatch)
+  const fallbackUserRef = db.doc(`users/${uid}`);
+  const fallbackProfileRef = db.doc(`users/${uid}/data/profile`);
+  const [fallbackUserSnap, fallbackProfileSnap] = await Promise.all([
+    fallbackUserRef.get(),
+    fallbackProfileRef.get(),
+  ]);
+  const fallbackUser = fallbackUserSnap.exists ? fallbackUserSnap.data() : {};
+  const fallbackProfile = fallbackProfileSnap.exists
+    ? fallbackProfileSnap.data()
+    : {};
+  if (!fallbackUserSnap.exists && !fallbackProfileSnap.exists) {
+    console.warn(`No docs under users/${uid} either`);
+  } else {
+    console.log("Checked fallback root users path");
+  }
+  return (
+    fallbackProfile.pushSubscription ||
+    fallbackUser.pushSubscription ||
+    fallbackProfile.subscription ||
     null
   );
 }

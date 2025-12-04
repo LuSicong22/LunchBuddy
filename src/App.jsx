@@ -87,6 +87,7 @@ const VAPID_PUBLIC_KEY =
   (typeof __vapid_public_key !== "undefined" && __vapid_public_key) ||
   import.meta.env.VITE_VAPID_PUBLIC_KEY ||
   "";
+const confirmedDiningStorageKey = `lunchbuddy_confirmed_dining_${appId}`;
 
 const MealIcon = ({ className = "" }) => (
   <svg
@@ -230,6 +231,23 @@ export default function LunchBuddyApp() {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem(confirmedDiningStorageKey);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed?.confirmedDining) {
+        setConfirmedDining(parsed.confirmedDining);
+        if (parsed.diningViewMode) setDiningViewMode(parsed.diningViewMode);
+        setMyStatus(null);
+      }
+    } catch (error) {
+      console.error("Failed to restore dining from storage", error);
+      localStorage.removeItem(confirmedDiningStorageKey);
+    }
   }, []);
 
   const hasDismissedInstallPrompt = () =>
@@ -490,6 +508,7 @@ export default function LunchBuddyApp() {
             fromNickname: data.fromNickname || data.nickname || "好友",
             fromAvatarColor: data.fromAvatarColor || data.avatarColor || "bg-orange-500",
             lunchPlan,
+            status: data.status || "pending",
           };
         });
 
@@ -519,14 +538,21 @@ export default function LunchBuddyApp() {
               fromNickname: docData.fromNickname || docData.nickname || "好友",
               fromAvatarColor: docData.fromAvatarColor || docData.avatarColor || "bg-orange-500",
               lunchPlan,
+              status: docData.status || "pending",
             };
           }
         });
 
         setIncomingInvites(invites);
-        if (invites.length > invitePrevCountRef.current || latestInvite) {
+        if (latestInvite && latestInvite.status === "accepted") {
+          setConfirmedDining((prev) =>
+            prev && prev.partner?.id === latestInvite.fromUid
+              ? { ...prev, isAcknowledged: true }
+              : prev
+          );
+        } else if (invites.length > invitePrevCountRef.current || latestInvite) {
           const latest = latestInvite || invites[invites.length - 1];
-          if (latest) {
+          if (latest && latest.status !== "accepted") {
             const friendPayload = {
               id: latest.fromUid,
               nickname: latest.fromNickname,
@@ -614,6 +640,18 @@ export default function LunchBuddyApp() {
   useEffect(() => {
     ensurePushSubscription();
   }, [ensurePushSubscription]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (confirmedDining) {
+      localStorage.setItem(
+        confirmedDiningStorageKey,
+        JSON.stringify({ confirmedDining, diningViewMode })
+      );
+    } else {
+      localStorage.removeItem(confirmedDiningStorageKey);
+    }
+  }, [confirmedDining, diningViewMode]);
 
   const handleDismissNotificationPrompt = () => {
     setShowNotificationPermissionPrompt(false);
@@ -892,6 +930,7 @@ export default function LunchBuddyApp() {
         lunchPlan: plan,
         createdAt: now,
         updatedAt: now,
+        status: "pending",
       });
     } catch (error) {
       console.error("Send invite failed:", error);
@@ -916,6 +955,37 @@ export default function LunchBuddyApp() {
     }
   };
 
+  const notifyInviteAccepted = async (targetFriend) => {
+    if (!db || !user || !targetFriend?.id) return;
+    const now = new Date().toISOString();
+    const ackRef = doc(
+      db,
+      "artifacts",
+      appId,
+      "users",
+      targetFriend.id,
+      "invites",
+      user.uid
+    );
+    try {
+      await setDoc(
+        ackRef,
+        {
+          fromUid: user.uid,
+          fromNickname: userProfile?.nickname || "好友",
+          fromAvatarColor: userProfile?.avatarColor || "bg-orange-500",
+          lunchPlan: targetFriend.lunchPlan || lunchDetails,
+          status: "accepted",
+          updatedAt: now,
+          createdAt: now,
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error("Notify accept failed:", error);
+    }
+  };
+
   const handlePartnerAccept = async () => {
     if (!friendToDate) return;
     const finalPlan = friendToDate.lunchPlan || lunchDetails;
@@ -924,6 +994,7 @@ export default function LunchBuddyApp() {
     }
     if (datingStep === "received_invite") {
       await clearInviteForCurrentUser(friendToDate);
+      await notifyInviteAccepted(friendToDate);
     }
     const participantEntries = [
       { friendId: null, role: "我", isSelf: true },
@@ -942,6 +1013,7 @@ export default function LunchBuddyApp() {
         minute: "2-digit",
       }),
       isAcknowledged: datingStep === "received_invite",
+      isReceiver: datingStep === "received_invite",
       isGroup,
       participants: mappedParticipants,
       title: `${userProfile?.nickname || "我"} x ${
@@ -1333,23 +1405,25 @@ export default function LunchBuddyApp() {
                         " & " +
                         confirmedDining.partner.nickname}
                     </p>
-                    <div className="mt-2">
-                      {confirmedDining.isAcknowledged ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                          <CheckCircle2 size={12} />{" "}
-                          {diningViewMode === "me"
-                            ? "对方已确认收到"
-                            : "我已确认收到"}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-500 bg-orange-50 px-3 py-1 rounded-full animate-pulse">
-                          <Clock size={12} />{" "}
-                          {diningViewMode === "me"
-                            ? "等待对方确认收到..."
-                            : "等待我确认收到..."}
-                        </span>
-                      )}
-                    </div>
+                    {!confirmedDining.isReceiver && (
+                      <div className="mt-2">
+                        {confirmedDining.isAcknowledged ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                            <CheckCircle2 size={12} />{" "}
+                            {diningViewMode === "me"
+                              ? "对方已确认收到"
+                              : "我已确认收到"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-500 bg-orange-50 px-3 py-1 rounded-full animate-pulse">
+                            <Clock size={12} />{" "}
+                            {diningViewMode === "me"
+                              ? "等待对方确认收到..."
+                              : "等待我确认收到..."}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
