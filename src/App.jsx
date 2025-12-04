@@ -75,6 +75,8 @@ if (firebaseConfig) {
   console.warn("Firebase 配置缺失，应用将以离线模式运行。");
 }
 
+const NICKNAME_MAX_LENGTH = 10;
+
 const appId =
   typeof __app_id !== "undefined"
     ? __app_id
@@ -175,6 +177,7 @@ export default function LunchBuddyApp() {
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [isComposingName, setIsComposingName] = useState(false);
 
   const [notification, setNotification] = useState(null);
 
